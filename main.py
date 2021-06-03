@@ -45,6 +45,4 @@ def a_game():
     # On lance la boucle des tours
     while(status != "KO" && status != "GG"):
 
-
-
     return
