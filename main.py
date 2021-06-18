@@ -35,13 +35,9 @@ Case: {
 '''
 from client.crocomine_client import CrocomineClient
 from pprint import pprint
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 import subprocess
 from itertools import combinations
-
-
-def print_hi(name):
-    print(f'Hi, {name}')
 
 
 # FONCTION IMPORTE DEPUIS LE TP SUDOKU
@@ -75,7 +71,37 @@ def clauses_to_dimacs(clauses, nb_vars):
     return res
 
 
-def processingInfos(infos, mat):
+# DICTIONNAIRE DE CORRESPONDANCE
+class dicoCorrespondance:
+    def __init__(self):
+        self.corres = ["T", "S", "C", "N"]
+
+    '''
+    def add(self, i, j):
+        if (i,j) not in self.key:
+            self.key.append((i,j))
+    
+    def cellToConstraint(self, i, j, type):
+        self.add(i, j)
+        return self.key.index((i,j))*4 + 1 + self.corres.index(type)
+
+    def constraintToCell(self, val):
+        return self.key[(val-1)//4], self.corres[(val-1)%4]
+    '''
+
+    def cellToVariable(self, i: int, j: int, n: int, type: str) -> int:
+        return i * n * 4 + j * 4 + self.corres.index(type) + 1
+
+    def variableToCell(self, n: int, var: int) -> Tuple[Tuple[int, int], str]:
+        v = var - 1
+        return (v // (4 * n), v // 4), self.corres[v % 4]
+
+
+def unique(variables: List[int]) -> List[List[int]]:
+    return [variables[:]] + [list(a) for a in combinations([-x for x in variables], 2)]
+
+
+def processingInfos(infos, mat, d):
     if not infos:
         return
     for info in infos:
@@ -90,12 +116,21 @@ def processingInfos(infos, mat):
     return
 
 
+def createGridConstraint(m: int, n: int, d: dicoCorrespondance) -> List[List[int]]:
+    res: List[List[int]] = [[]]
+    res.pop()
+    for i in range(m):
+        for j in range(n):
+            res.extend(unique([d.cellToVariable(i, j, n, s) for s in d.corres]))
+    return res
+
+
 def affichageMat(gridInfos, matInfo):
     print("Affichage de l'état des choses")
     for i in range(gridInfos["m"]):
         for j in range(gridInfos["n"]):
-            if (matInfo[i][j]["hasBeenCleared"]):
-                if (matInfo[i][j]["content"] == "safe"):
+            if matInfo[i][j]["hasBeenCleared"]:
+                if matInfo[i][j]["content"] == "safe":
                     print("O", end=' ')
                 else:
                     print(matInfo[i][j]["content"], end=' ')
@@ -114,11 +149,24 @@ def affichageMat(gridInfos, matInfo):
 def a_game():
     # on demande la nouvelle carte
     status, msg, gridInfos = croco.new_grid()
+    m = gridInfos["m"]
+    n = gridInfos["n"]
 
     # Si il y a erreur, on quitte
     if status == "Err":
         print(f'erreur : {msg}')
         return
+
+    # C'est une solution de schlag mais ça marche, pour la correspondance
+    global d
+    d = dicoCorrespondance()
+
+    # On crée une liste dynamique des clauses
+    clause: List[List[int]] = [[]]
+    clause.pop()
+    pprint(clause)
+    clause.extend(createGridConstraint(m, n, d))
+
 
     # on crée un modèle de données et rentre les infos dedans
     matInfo = [[{"isFieldKnown": False, "fieldType": "unknown", "hasBeenCleared": False, "content": "unknown",
@@ -129,13 +177,14 @@ def a_game():
     status, msg, infos = croco.discover(gridInfos["start"][0], gridInfos["start"][1])
     print(status, msg)
     pprint(infos)
-    processingInfos(infos, matInfo)
+    processingInfos(infos, matInfo, d)
     affichageMat(gridInfos, matInfo)
 
     # On lance la boucle des tours
-    while (status != "KO" and status != "GG"):
-        return
-
+    while status != "KO" and status != "GG":
+        for i in range(gridInfos["m"]):
+            for j in range(gridInfos["n"]):
+                return
     return
 
 
@@ -146,5 +195,4 @@ if __name__ == '__main__':
     members = "Styvain et Blouis"
     global croco
     croco = CrocomineClient(server, group, members)
-    print_hi('PyCharm')
     a_game()
