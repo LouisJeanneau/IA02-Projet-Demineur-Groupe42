@@ -35,22 +35,50 @@ Case: {
         ./serveur/win64/crocomine-lite-beta4.exe :8000 ./serveur/grilles/
 
 '''
+import os
+
 from client.crocomine_client import CrocomineClient
-from pprint import pprint
-from typing import List, Tuple, Dict
+from typing import List, Tuple
 import subprocess
 from itertools import combinations
+import queue
 
 voisins = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
 corres = ["T", "S", "C", "N"]
 
+''' FONCTION IMPORTE DEPUIS LE TP SUDOKU ET CREEE '''
 
-# FONCTION IMPORTE DEPUIS LE TP SUDOKU
+
+# Prend une str pour l'écrire dans le fichier
 def write_dimacs_file(dimacs: str, filename: str):
     with open(filename, "w", newline="") as cnf:
         cnf.write(dimacs)
 
+# Rajoute une str à la fin du fichier
+def append_dimacs_file(dimacs: str, filename: str):
+    with open(filename, "a", newline="") as cnf:
+        cnf.write(dimacs)
 
+# Supprime la derniere ligne du fichier
+def truncate_dimacs_file(filename: str):
+    position = 0
+    with open(filename) as cnf:
+        cnf.seek(0, os.SEEK_END)
+        position = cnf.tell()
+        position -= 1
+        c = ''
+        while position != 0 and c != '\n':
+            position -= 1
+            cnf.seek(position)
+            c = cnf.read(1)
+            print(f'voici c : {c}')
+
+    with open(filename, "a", newline="") as cnf:
+        cnf.truncate(position+1)
+    return
+
+
+# Exec le solveur SAT sur le fichier
 def exec_gophersat(
         filename: str, cmd: str = "gophersat-1.1.6.exe", encoding: str = "utf8") -> Tuple[bool, List[int]]:
     result = subprocess.run([cmd, filename], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True,
@@ -66,7 +94,8 @@ def exec_gophersat(
     return True, [int(x) for x in model]
 
 
-def clauses_to_dimacs(clauses, nb_vars):
+# prend une list de list avec les clauses, et le nb de variables du SAT, pour coder la str CNFmypy
+def clauses_to_dimacs(clauses: List[List[int]], nb_vars: int):
     res: str = ""
     res += "p cnf " + str(nb_vars) + " " + str(len(clauses)) + "\n"
     for clause in clauses:
@@ -76,27 +105,7 @@ def clauses_to_dimacs(clauses, nb_vars):
     return res
 
 
-# DICTIONNAIRE DE CORRESPONDANCE
-'''
-class dicoCorrespondance:
-    def __init__(self):
-        self.corres = ["T", "S", "C", "N"]
-
-    
-    def add(self, i, j):
-        if (i,j) not in self.key:
-            self.key.append((i,j))
-    
-    def cellToConstraint(self, i, j, type):
-        self.add(i, j)
-        return self.key.index((i,j))*4 + 1 + self.corres.index(type)
-
-    def constraintToCell(self, val):
-        return self.key[(val-1)//4], self.corres[(val-1)%4]
-'''
-
-
-# Fonction pour coder le SAT
+# FONCTION MAISON POUR CODER LE SAT
 def cellToVariable(i: int, j: int, n: int, animal: str) -> int:
     return i * n * 4 + j * 4 + corres.index(animal) + 1
 
@@ -117,24 +126,34 @@ def exactlyOutOf(variables: List[int], k: int) -> List[List[int]]:
         return [list(a) for a in combinations(variables, 1)]
     res: List[List[int]] = [[0]]
     res.pop()
-    res.extend([list(a) for a in combinations(variables, len(variables)+1-k)])
-    res.extend([list(a) for a in combinations([-x for x in variables], k+1)])
+    res.extend([list(a) for a in combinations(variables, len(variables) + 1 - k)])
+    res.extend([list(a) for a in combinations([-x for x in variables], k + 1)])
     return res
 
 
-def getNeighbours(i: int, j: int) -> List[Tuple[int]]:
-    res: List[Tuple[int]] = [(0, 0)]
+def getNeighbours(i: int, j: int) -> List[Tuple[int, int]]:
+    res: List[Tuple[int, int]] = [(0, 0)]
     res.pop()
     for (k, l) in voisins:
-        if i + k >= 0 and i + k < m:
-            if j + l >= 0 and j + l < n:
+        if 0 <= i + k < m:
+            if 0 <= j + l < n:
                 res.append(((i + k), (j + l)))
     return res
 
 
-def codeNeighboursConstraint(neighbours: List[Tuple[int]], k:int, animal: str):
+def codeNeighboursConstraint(neighbours: List[Tuple[int, int]], k: int, animal: str) -> List[List[int]]:
+    var: List[int] = []
+    for (i, j) in neighbours:
+        var.append(cellToVariable(i, j, n, animal))
+    return exactlyOutOf(var, k)
 
-    return
+
+def codeFieldConstraint(i, j, field: str) -> List[List[int]]:
+    if field == "sea":
+        return [[-cellToVariable(i, j, n, "T")]]
+    if field == "land":
+        return [[-cellToVariable(i, j, n, "S")]]
+    return []
 
 
 def createGridConstraint(m: int, n: int) -> List[List[int]]:
@@ -146,19 +165,42 @@ def createGridConstraint(m: int, n: int) -> List[List[int]]:
     return res
 
 
-def processingInfos(infos, mat):
+def processingInfos(infos, mat, borderQueue: queue) -> List[List[int]]:
+    res: List[List[int]] = []
     if not infos:
-        return
+        return res
     for info in infos:
         i = info["pos"][0]
         j = info["pos"][1]
         mat[i][j]["isFieldKnown"] = True
         mat[i][j]["fieldType"] = info["field"]
+        res.extend(codeFieldConstraint(i, j, info["field"]))
         if "prox_count" in info:
             mat[i][j]["hasBeenCleared"] = True
             mat[i][j]["content"] = "safe"
             mat[i][j]["proxCount"] = info["prox_count"]
-    return
+            neighbours = getNeighbours(i, j)
+            mat[i][j]["isBorder"] = False
+            for a in range(3):
+                res.extend(codeNeighboursConstraint(neighbours, info["prox_count"][a], corres[a]))
+            res.extend(codeNeighboursConstraint(neighbours, len(neighbours) - sum(info["prox_count"]), "N"))
+        elif "animal" in info:
+            mat[i][j]["hasBeenCleared"] = True
+            mat[i][j]["content"] = info["animal"]
+        else:
+            mat[i][j]["isBorder"] = True
+            borderQueue.put((i, j))
+    return res
+
+
+def makeHypothesis(i: int, j: int) -> Tuple[int, str]:
+    for animal in corres:
+        append_dimacs_file(str(-cellToVariable(i, j, n, animal)) + " 0\n", "test.cnf")
+        solver, trash = exec_gophersat("test.cnf")
+        print(f'resultat du solver sur i={i} ')
+        if solver:
+            truncate_dimacs_file("test.cnf")
+    return True, "a"
 
 
 # Fonction de debug
@@ -183,7 +225,7 @@ def affichageMat(gridInfos, matInfo):
 
 
 # on commence une partie
-def a_game():
+def a_game(cro : CrocomineClient):
     # on demande la nouvelle carte
     status, msg, gridInfos = croco.new_grid()
     global m
@@ -197,28 +239,41 @@ def a_game():
         return
 
     # On crée une liste dynamique des clauses
-    clause: List[List[int]] = [[]]
-    clause.pop()
-    pprint(clause)
+    clause: List[List[int]] = []
     clause.extend(createGridConstraint(m, n))
 
+    # On crée une liste de case en bordure de la zone connue
+    borderQueue: queue = queue.Queue()
+
     # on crée un modèle de données et rentre les infos dedans
-    matInfo = [[{"isFieldKnown": False, "fieldType": "unknown", "hasBeenCleared": False, "content": "unknown",
-                 "proxCount": (-1, -1, -1), "clearedProx": (0, 0, 0)} for j in range(gridInfos["n"])] for i in
+    matInfo = [[{"isFieldKnown": False,
+                 "fieldType": "unknown",
+                 "hasBeenCleared": False,
+                 "content": "unknown",
+                 "isBorder": False,
+                 "proxCount": (-1, -1, -1),
+                 "clearedProx": (0, 0, 0)}
+                for j in range(gridInfos["n"])]
+               for i in
                range(gridInfos["m"])]
 
-    # On fait un premier discover sur la case de départ, et on traite ce discover
+    # On fait un premier discover sur la case de départ
     status, msg, infos = croco.discover(gridInfos["start"][0], gridInfos["start"][1])
-    print(status, msg)
-    pprint(infos)
-    processingInfos(infos, matInfo)
-    affichageMat(gridInfos, matInfo)
+    # print(status, msg)
+    # pprint(infos)
+    # affichageMat(gridInfos, matInfo)
+    # pprint(clause)
 
     # On lance la boucle des tours
     while status != "KO" and status != "GG":
-        for i in range(gridInfos["m"]):
-            for j in range(gridInfos["n"]):
-                return
+        clause.extend(processingInfos(infos, matInfo, borderQueue))
+        write_dimacs_file(clauses_to_dimacs(clause, n * m * 4), "test.cnf")
+        moveReady = False
+        while not moveReady:
+            border = borderQueue.get()
+            moveReady, guess = makeHypothesis(border[0], border[1])
+            print("inner boucle")
+            return
     return
 
 
@@ -227,6 +282,5 @@ if __name__ == '__main__':
     server = "http://localhost:8000"
     group = "Groupe 42"
     members = "Styvain et Blouis"
-    global croco
     croco = CrocomineClient(server, group, members)
-    a_game()
+    a_game(croco)
