@@ -31,7 +31,9 @@ Case: {
 }
 
     path de mon dossier : \Drive\01_UTC\GI02\ProjetIA02
-        commande cmd : .\serveur\win64\crocomine-lite-beta3.exe :8000 .\serveur\grilles\
+        commande cmd : .\serveur\win64\crocomine-lite-beta4.exe :8000 .\serveur\grilles\
+        ./serveur/win64/crocomine-lite-beta4.exe :8000 ./serveur/grilles/
+
 '''
 from client.crocomine_client import CrocomineClient
 from pprint import pprint
@@ -39,6 +41,8 @@ from typing import List, Tuple, Dict
 import subprocess
 from itertools import combinations
 
+voisins = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
+corres = ["T", "S", "C", "N"]
 
 # FONCTION IMPORTE DEPUIS LE TP SUDOKU
 def write_dimacs_file(dimacs: str, filename: str):
@@ -72,11 +76,12 @@ def clauses_to_dimacs(clauses, nb_vars):
 
 
 # DICTIONNAIRE DE CORRESPONDANCE
+'''
 class dicoCorrespondance:
     def __init__(self):
         self.corres = ["T", "S", "C", "N"]
 
-    '''
+    
     def add(self, i, j):
         if (i,j) not in self.key:
             self.key.append((i,j))
@@ -87,21 +92,39 @@ class dicoCorrespondance:
 
     def constraintToCell(self, val):
         return self.key[(val-1)//4], self.corres[(val-1)%4]
-    '''
+'''
 
-    def cellToVariable(self, i: int, j: int, n: int, type: str) -> int:
-        return i * n * 4 + j * 4 + self.corres.index(type) + 1
 
-    def variableToCell(self, n: int, var: int) -> Tuple[Tuple[int, int], str]:
-        v = var - 1
-        return (v // (4 * n), v // 4), self.corres[v % 4]
 
+# Fonction pour coder le SAT
+def cellToVariable(i: int, j: int, n: int, type: str) -> int:
+    return i * n * 4 + j * 4 + corres.index(type) + 1
+
+def variableToCell(n: int, var: int) -> Tuple[Tuple[int, int], str]:
+    v = var - 1
+    return (v // (4 * n), v // 4), corres[v % 4]
 
 def unique(variables: List[int]) -> List[List[int]]:
     return [variables[:]] + [list(a) for a in combinations([-x for x in variables], 2)]
 
+def getNeighbours(i: int, j: int) -> List[Tuple[int]]:
+    res: List[Tuple[int]] = [(0,0)]
+    res.pop()
+    for (k,l) in voisins:
+        if i+k >= 0 and i+k < m :
+            if j+l >= 0 and j+l < n:
+                res.append(((i+k), (j+l)))
+    return res
 
-def processingInfos(infos, mat, d):
+def createGridConstraint(m: int, n: int) -> List[List[int]]:
+    res: List[List[int]] = [[]]
+    res.pop()
+    for i in range(m):
+        for j in range(n):
+            res.extend(unique([cellToVariable(i, j, n, s) for s in corres]))
+    return res
+
+def processingInfos(infos, mat):
     if not infos:
         return
     for info in infos:
@@ -115,16 +138,7 @@ def processingInfos(infos, mat, d):
             mat[i][j]["proxCount"] = info["prox_count"]
     return
 
-
-def createGridConstraint(m: int, n: int, d: dicoCorrespondance) -> List[List[int]]:
-    res: List[List[int]] = [[]]
-    res.pop()
-    for i in range(m):
-        for j in range(n):
-            res.extend(unique([d.cellToVariable(i, j, n, s) for s in d.corres]))
-    return res
-
-
+# Fonction de debug
 def affichageMat(gridInfos, matInfo):
     print("Affichage de l'état des choses")
     for i in range(gridInfos["m"]):
@@ -149,7 +163,9 @@ def affichageMat(gridInfos, matInfo):
 def a_game():
     # on demande la nouvelle carte
     status, msg, gridInfos = croco.new_grid()
+    global m
     m = gridInfos["m"]
+    global n
     n = gridInfos["n"]
 
     # Si il y a erreur, on quitte
@@ -157,15 +173,12 @@ def a_game():
         print(f'erreur : {msg}')
         return
 
-    # C'est une solution de schlag mais ça marche, pour la correspondance
-    global d
-    d = dicoCorrespondance()
 
     # On crée une liste dynamique des clauses
     clause: List[List[int]] = [[]]
     clause.pop()
     pprint(clause)
-    clause.extend(createGridConstraint(m, n, d))
+    clause.extend(createGridConstraint(m, n))
 
 
     # on crée un modèle de données et rentre les infos dedans
@@ -177,7 +190,7 @@ def a_game():
     status, msg, infos = croco.discover(gridInfos["start"][0], gridInfos["start"][1])
     print(status, msg)
     pprint(infos)
-    processingInfos(infos, matInfo, d)
+    processingInfos(infos, matInfo)
     affichageMat(gridInfos, matInfo)
 
     # On lance la boucle des tours
