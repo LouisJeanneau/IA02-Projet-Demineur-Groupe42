@@ -197,10 +197,12 @@ def makeHypothesis(i: int, j: int) -> Tuple[int, str]:
     for animal in corres:
         append_dimacs_file(str(-cellToVariable(i, j, n, animal)) + " 0\n", "test.cnf")
         solver, trash = exec_gophersat("test.cnf")
-        print(f'resultat du solver sur i={i} ')
+        print(f'resultat du solver sur i={i} j={j} avec animal {animal} :   {solver}')
         if solver:
             truncate_dimacs_file("test.cnf")
-    return True, "a"
+        else:
+            return True, animal
+    return False, "next"
 
 
 # Fonction de debug
@@ -272,8 +274,11 @@ def a_game(cro : CrocomineClient):
         while not moveReady:
             border = borderQueue.get()
             moveReady, guess = makeHypothesis(border[0], border[1])
-            print("inner boucle")
-            return
+            if moveReady:
+                if guess=="N":
+                    cro.discover(border[0], border[1])
+                else:
+                    cro.guess(border[0], border[1], guess)
     return
 
 
