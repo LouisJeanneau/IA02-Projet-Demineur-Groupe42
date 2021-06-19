@@ -44,6 +44,7 @@ from itertools import combinations
 voisins = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
 corres = ["T", "S", "C", "N"]
 
+
 # FONCTION IMPORTE DEPUIS LE TP SUDOKU
 def write_dimacs_file(dimacs: str, filename: str):
     with open(filename, "w", newline="") as cnf:
@@ -95,26 +96,46 @@ class dicoCorrespondance:
 '''
 
 
-
 # Fonction pour coder le SAT
-def cellToVariable(i: int, j: int, n: int, type: str) -> int:
-    return i * n * 4 + j * 4 + corres.index(type) + 1
+def cellToVariable(i: int, j: int, n: int, animal: str) -> int:
+    return i * n * 4 + j * 4 + corres.index(animal) + 1
+
 
 def variableToCell(n: int, var: int) -> Tuple[Tuple[int, int], str]:
     v = var - 1
     return (v // (4 * n), v // 4), corres[v % 4]
 
+
 def unique(variables: List[int]) -> List[List[int]]:
     return [variables[:]] + [list(a) for a in combinations([-x for x in variables], 2)]
 
-def getNeighbours(i: int, j: int) -> List[Tuple[int]]:
-    res: List[Tuple[int]] = [(0,0)]
+
+def exactlyOutOf(variables: List[int], k: int) -> List[List[int]]:
+    if k == 0:
+        return [list(a) for a in combinations([-x for x in variables], 1)]
+    if k == len(variables):
+        return [list(a) for a in combinations(variables, 1)]
+    res: List[List[int]] = [[0]]
     res.pop()
-    for (k,l) in voisins:
-        if i+k >= 0 and i+k < m :
-            if j+l >= 0 and j+l < n:
-                res.append(((i+k), (j+l)))
+    res.extend([list(a) for a in combinations(variables, len(variables)+1-k)])
+    res.extend([list(a) for a in combinations([-x for x in variables], k+1)])
     return res
+
+
+def getNeighbours(i: int, j: int) -> List[Tuple[int]]:
+    res: List[Tuple[int]] = [(0, 0)]
+    res.pop()
+    for (k, l) in voisins:
+        if i + k >= 0 and i + k < m:
+            if j + l >= 0 and j + l < n:
+                res.append(((i + k), (j + l)))
+    return res
+
+
+def codeNeighboursConstraint(neighbours: List[Tuple[int]], k:int, animal: str):
+
+    return
+
 
 def createGridConstraint(m: int, n: int) -> List[List[int]]:
     res: List[List[int]] = [[]]
@@ -123,6 +144,7 @@ def createGridConstraint(m: int, n: int) -> List[List[int]]:
         for j in range(n):
             res.extend(unique([cellToVariable(i, j, n, s) for s in corres]))
     return res
+
 
 def processingInfos(infos, mat):
     if not infos:
@@ -137,6 +159,7 @@ def processingInfos(infos, mat):
             mat[i][j]["content"] = "safe"
             mat[i][j]["proxCount"] = info["prox_count"]
     return
+
 
 # Fonction de debug
 def affichageMat(gridInfos, matInfo):
@@ -173,13 +196,11 @@ def a_game():
         print(f'erreur : {msg}')
         return
 
-
     # On crée une liste dynamique des clauses
     clause: List[List[int]] = [[]]
     clause.pop()
     pprint(clause)
     clause.extend(createGridConstraint(m, n))
-
 
     # on crée un modèle de données et rentre les infos dedans
     matInfo = [[{"isFieldKnown": False, "fieldType": "unknown", "hasBeenCleared": False, "content": "unknown",
