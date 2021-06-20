@@ -14,6 +14,9 @@ def put_random_animal(map, animal: str, nombre: int):
         # TODO: should we specify W like example map ?
         if map[x][y] not in constants.ANIMAL_CHAR.values():
             map[x][y] = constants.ANIMAL_CHAR.get(animal)
+        else:
+            nombre = nombre + 1
+
 
 def generate_map(size: (int, int), percent_animal: (int, int, int)):
     """
