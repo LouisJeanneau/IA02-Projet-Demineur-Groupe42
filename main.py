@@ -36,12 +36,10 @@ Case: {
 
 '''
 import os
-
 from client.crocomine_client import CrocomineClient
 from typing import List, Tuple
 import subprocess
 from itertools import combinations
-import queue
 
 voisins = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
 corres = ["T", "S", "C", "N"]
@@ -54,10 +52,12 @@ def write_dimacs_file(dimacs: str, filename: str):
     with open(filename, "w", newline="") as cnf:
         cnf.write(dimacs)
 
+
 # Rajoute une str à la fin du fichier
 def append_dimacs_file(dimacs: str, filename: str):
     with open(filename, "a", newline="") as cnf:
         cnf.write(dimacs)
+
 
 # Supprime la derniere ligne du fichier
 def truncate_dimacs_file(filename: str):
@@ -71,10 +71,10 @@ def truncate_dimacs_file(filename: str):
             position -= 1
             cnf.seek(position)
             c = cnf.read(1)
-            print(f'voici c : {c}')
+            # print(f'voici c : {c}')
 
     with open(filename, "a", newline="") as cnf:
-        cnf.truncate(position+1)
+        cnf.truncate(position + 1)
     return
 
 
@@ -165,7 +165,7 @@ def createGridConstraint(m: int, n: int) -> List[List[int]]:
     return res
 
 
-def processingInfos(infos, mat, borderQueue: queue) -> List[List[int]]:
+def processingInfos(infos, mat, borderQueue: List[Tuple[int, int]]) -> List[List[int]]:
     res: List[List[int]] = []
     if not infos:
         return res
@@ -181,15 +181,22 @@ def processingInfos(infos, mat, borderQueue: queue) -> List[List[int]]:
             mat[i][j]["proxCount"] = info["prox_count"]
             neighbours = getNeighbours(i, j)
             mat[i][j]["isBorder"] = False
+            res.append([cellToVariable(i, j, n, "N")])
             for a in range(3):
                 res.extend(codeNeighboursConstraint(neighbours, info["prox_count"][a], corres[a]))
             res.extend(codeNeighboursConstraint(neighbours, len(neighbours) - sum(info["prox_count"]), "N"))
+            if sum(info["prox_count"]) == 0:
+                for neighbour in neighbours:
+                    if neighbour in borderQueue:
+                        borderQueue.remove(neighbour)
         elif "animal" in info:
             mat[i][j]["hasBeenCleared"] = True
             mat[i][j]["content"] = info["animal"]
+            res.append([cellToVariable(i, j, n, info["animal"])])
         else:
             mat[i][j]["isBorder"] = True
-            borderQueue.put((i, j))
+            if borderQueue.count((i, j)) == 0:
+                borderQueue.append((i, j))
     return res
 
 
@@ -197,7 +204,7 @@ def makeHypothesis(i: int, j: int) -> Tuple[int, str]:
     for animal in corres:
         append_dimacs_file(str(-cellToVariable(i, j, n, animal)) + " 0\n", "test.cnf")
         solver, trash = exec_gophersat("test.cnf")
-        print(f'resultat du solver sur i={i} j={j} avec animal {animal} :   {solver}')
+        # print(f'resultat du solver sur i={i} j={j} avec animal {animal} :   {solver}')
         if solver:
             truncate_dimacs_file("test.cnf")
         else:
@@ -227,9 +234,9 @@ def affichageMat(gridInfos, matInfo):
 
 
 # on commence une partie
-def a_game(cro : CrocomineClient):
+def a_game(c: CrocomineClient):
     # on demande la nouvelle carte
-    status, msg, gridInfos = croco.new_grid()
+    status, msg, gridInfos = c.new_grid()
     global m
     m = gridInfos["m"]
     global n
@@ -245,7 +252,7 @@ def a_game(cro : CrocomineClient):
     clause.extend(createGridConstraint(m, n))
 
     # On crée une liste de case en bordure de la zone connue
-    borderQueue: queue = queue.Queue()
+    borderQueue: List[Tuple[int, int]] = []
 
     # on crée un modèle de données et rentre les infos dedans
     matInfo = [[{"isFieldKnown": False,
@@ -260,7 +267,7 @@ def a_game(cro : CrocomineClient):
                range(gridInfos["m"])]
 
     # On fait un premier discover sur la case de départ
-    status, msg, infos = croco.discover(gridInfos["start"][0], gridInfos["start"][1])
+    status, msg, infos = c.discover(gridInfos["start"][0], gridInfos["start"][1])
     # print(status, msg)
     # pprint(infos)
     # affichageMat(gridInfos, matInfo)
@@ -271,14 +278,17 @@ def a_game(cro : CrocomineClient):
         clause.extend(processingInfos(infos, matInfo, borderQueue))
         write_dimacs_file(clauses_to_dimacs(clause, n * m * 4), "test.cnf")
         moveReady = False
+        # print(borderQueue)
         while not moveReady:
-            border = borderQueue.get()
+            border = borderQueue.pop(0)
             moveReady, guess = makeHypothesis(border[0], border[1])
             if moveReady:
-                if guess=="N":
-                    cro.discover(border[0], border[1])
+                if guess == "N":
+                    status, msg, infos = c.discover(border[0], border[1])
                 else:
-                    cro.guess(border[0], border[1], guess)
+                    status, msg, infos = c.guess(border[0], border[1], guess)
+            else:
+                borderQueue.append(border)
     return
 
 
