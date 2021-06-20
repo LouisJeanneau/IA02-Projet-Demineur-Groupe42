@@ -11,6 +11,7 @@ def put_random_animal(map, animal: str, nombre: int):
     for i in range(nombre):
         x = random.randint(0, len(map) - 1)
         y = random.randint(0, len(map[0]) - 1)
+        # TODO: should we specify W like example map ?
         if map[x][y] not in constants.ANIMAL_CHAR.values():
             map[x][y] = constants.ANIMAL_CHAR.get(animal)
 
