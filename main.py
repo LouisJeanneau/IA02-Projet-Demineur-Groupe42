@@ -164,6 +164,9 @@ def a_game():
     # on demande la nouvelle carte
     status, msg, gridInfos = croco.new_grid()
     global m
+    if "m" not in gridInfos:
+        print(f'err: no map')
+        return
     m = gridInfos["m"]
     global n
     n = gridInfos["n"]
