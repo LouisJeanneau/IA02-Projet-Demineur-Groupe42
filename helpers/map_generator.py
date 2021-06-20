@@ -2,6 +2,12 @@ import random
 import constants
 
 def put_random_animal(map, animal: str, nombre: int):
+    """
+    this function place corresponding "animal" char randomly on "map"
+    :param map: 2d array
+    :param animal:
+    :param nombre:
+    """
     for i in range(nombre):
         x = random.randint(0, len(map) - 1)
         y = random.randint(0, len(map[0]) - 1)
