@@ -40,6 +40,7 @@ from client.crocomine_client import CrocomineClient
 from typing import List, Tuple
 import subprocess
 from itertools import combinations
+import pycryptosat
 
 voisins = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
 corres = ["T", "S", "C", "N"]
@@ -206,13 +207,15 @@ def processingInfos(infos, mat, borderQueue: List[Tuple[int, int]]) -> List[List
     return res
 
 
-def makeHypothesis(i: int, j: int) -> Tuple[int, str]:
+def makeHypothesis(i: int, j: int, s : pycryptosat.Solver) -> Tuple[int, str]:
     for animal in corres:
-        append_dimacs_file(str(-cellToVariable(i, j, n, animal)) + " 0\n", "test.cnf")
-        solver, trash = exec_gophersat("test.cnf")
+        #append_dimacs_file(str(-cellToVariable(i, j, n, animal)) + " 0\n", "test.cnf")
+        solver, trash = s.solve([-cellToVariable(i, j, n, animal)])
+        # solver, trash = exec_gophersat("test.cnf")
         # print(f'resultat du solver sur i={i} j={j} avec animal {animal} :   {solver}')
         if solver:
-            truncate_dimacs_file("test.cnf")
+            # nothing
+            print("suivant")
         else:
             return True, animal
     return False, "next"
@@ -260,6 +263,9 @@ def a_game(c: CrocomineClient):
     clause: List[List[int]] = []
     clause.extend(createGridConstraint(m, n))
 
+    s = pycryptosat.Solver()
+    s.add_clauses(clause)
+
     # On crée une liste de case en bordure de la zone connue
     borderQueue: List[Tuple[int, int]] = []
 
@@ -284,13 +290,13 @@ def a_game(c: CrocomineClient):
 
     # On lance la boucle des tours
     while status != "KO" and status != "GG":
-        clause.extend(processingInfos(infos, matInfo, borderQueue))
-        write_dimacs_file(clauses_to_dimacs(clause, n * m * 4), "test.cnf")
+        s.add_clauses(processingInfos(infos, matInfo, borderQueue))
+        # write_dimacs_file(clauses_to_dimacs(clause, n * m * 4), "test.cnf")
         moveReady = False
         # print(borderQueue)
         while not moveReady:
             border = borderQueue.pop(0)
-            moveReady, guess = makeHypothesis(border[0], border[1])
+            moveReady, guess = makeHypothesis(border[0], border[1], s)
             if moveReady:
                 if guess == "N":
                     status, msg, infos = c.discover(border[0], border[1])
