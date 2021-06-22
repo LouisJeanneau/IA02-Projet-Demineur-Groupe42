@@ -79,7 +79,6 @@ def truncate_dimacs_file(filename: str):
             cnf.seek(position)
             c = cnf.read(1)
             # print(f'voici c : {c}')
-
     with open(filename, "a", newline="") as cnf:
         cnf.truncate(position + 1)
     return
@@ -207,16 +206,13 @@ def processingInfos(infos, mat, borderQueue: List[Tuple[int, int]]) -> List[List
     return res
 
 
-def makeHypothesis(i: int, j: int, s : pycryptosat.Solver) -> Tuple[int, str]:
+def makeHypothesis(i: int, j: int, s: pycryptosat.Solver) -> Tuple[int, str]:
     for animal in corres:
-        #append_dimacs_file(str(-cellToVariable(i, j, n, animal)) + " 0\n", "test.cnf")
+        # append_dimacs_file(str(-cellToVariable(i, j, n, animal)) + " 0\n", "test.cnf")
         solver, trash = s.solve([-cellToVariable(i, j, n, animal)])
         # solver, trash = exec_gophersat("test.cnf")
         # print(f'resultat du solver sur i={i} j={j} avec animal {animal} :   {solver}')
-        if solver:
-            # nothing
-            print("suivant")
-        else:
+        if not solver:
             return True, animal
     return False, "next"
 
@@ -252,12 +248,11 @@ def a_game(c: CrocomineClient):
         print(f'erreur : {msg}')
         return status, msg
 
-    #sinon on récupère la taille de la map
+    # sinon on récupère la taille de la map
     global m
     m = gridInfos["m"]
     global n
     n = gridInfos["n"]
-
 
     # On crée une liste dynamique des clauses
     clause: List[List[int]] = []
