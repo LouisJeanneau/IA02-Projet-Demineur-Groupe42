@@ -243,18 +243,18 @@ def affichageMat(gridInfos, matInfo):
 def a_game(c: CrocomineClient):
     # on demande la nouvelle carte
     status, msg, gridInfos = c.new_grid()
-    global m
-    if "m" not in gridInfos:
-        print(f'err: no map')
-        return
-    m = gridInfos["m"]
-    global n
-    n = gridInfos["n"]
 
     # Si il y a erreur, on quitte
     if status == "Err":
         print(f'erreur : {msg}')
-        return
+        return status, msg
+
+    #sinon on récupère la taille de la map
+    global m
+    m = gridInfos["m"]
+    global n
+    n = gridInfos["n"]
+
 
     # On crée une liste dynamique des clauses
     clause: List[List[int]] = []
@@ -298,7 +298,7 @@ def a_game(c: CrocomineClient):
                     status, msg, infos = c.guess(border[0], border[1], guess)
             else:
                 borderQueue.append(border)
-    return
+    return status, msg
 
 
 # fonction qui se lance à l'éxecution
@@ -307,4 +307,8 @@ if __name__ == '__main__':
     group = "Groupe 42"
     members = "Styvain et Blouis"
     croco = CrocomineClient(server, group, members)
-    a_game(croco)
+    status = "OK"
+    while status != "Err":
+        status, msg = a_game(croco)
+        if (status == "KO"):
+            print(f"On s'est prix un KO")
