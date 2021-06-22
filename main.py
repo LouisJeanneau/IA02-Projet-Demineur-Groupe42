@@ -49,6 +49,12 @@ corres = ["T", "S", "C", "N"]
 
 # Prend une str pour l'écrire dans le fichier
 def write_dimacs_file(dimacs: str, filename: str):
+    """
+    Ecrit la str dimacs dans le fichier filename
+    :param dimacs:
+    :param filename:
+    :return:
+    """
     with open(filename, "w", newline="") as cnf:
         cnf.write(dimacs)
 

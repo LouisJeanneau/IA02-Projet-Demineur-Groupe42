@@ -6,6 +6,9 @@ FIELD_CHAR = {
 ANIMAL_CHAR = {
     "tigre" : "T",
     "requin": "S",
-    "crocodile": "C"
+    "crocodile": "C",
+    "water_crocodile": "W"
 }
+
+VOISINS = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
 
