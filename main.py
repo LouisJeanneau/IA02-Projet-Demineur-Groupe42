@@ -41,6 +41,7 @@ from typing import List, Tuple
 import subprocess
 from itertools import combinations
 import pycryptosat
+from helpers.timer import Timer, TimerError
 
 voisins = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
 corres = ["T", "S", "C", "N"]
@@ -225,7 +226,7 @@ def make_multiple_hypothesis(borderQueue: List[Tuple[int, int]], s: pycryptosat.
     for i, j in borderQueue:
         found_one, which = makeHypothesis(i, j, s)
         if found_one:
-            borderQueue.remove((i,j))
+            borderQueue.remove((i, j))
             if which == "N":
                 resDiscover.append((i, j))
             else:
@@ -279,7 +280,6 @@ def a_game(c: CrocomineClient):
 
     # On crée une liste de case en bordure de la zone connue
     borderQueue: List[Tuple[int, int]] = []
-    moveQueue: List[Tuple[int, int]] = []
 
     # on crée un modèle de données et rentre les infos dedans
     matInfo = [[{"isFieldKnown": False,
@@ -295,21 +295,14 @@ def a_game(c: CrocomineClient):
 
     # On fait un premier discover sur la case de départ
     status, msg, infos = c.discover(gridInfos["start"][0], gridInfos["start"][1])
-    # print(status, msg)
-    # pprint(infos)
-    # affichageMat(gridInfos, matInfo)
-    # pprint(clause)
+
     discover_queue: List[Tuple[int, int]] = []
     guess_queue: List[Tuple[int, int, str]] = []
 
     s.add_clauses(processingInfos(infos, matInfo, borderQueue, discover_queue))
 
-
     # On lance la boucle des tours
     while status != "KO" and status != "GG":
-
-        border_snapshot = borderQueue
-
         discover_queue_temp, guess_queue_temp = make_multiple_hypothesis(borderQueue, s)
         discover_queue.extend(discover_queue_temp)
         guess_queue.extend(guess_queue_temp)
@@ -324,7 +317,7 @@ def a_game(c: CrocomineClient):
             # on discover
             while discover_queue:
                 discover = discover_queue.pop(0)
-                print(f' clearedprox : {matInfo[discover[0]][discover[1]]["clearedProx"]} et proxcount {matInfo[discover[0]][discover[1]]["proxCount"]}')
+                # print(f' clearedprox : {matInfo[discover[0]][discover[1]]["clearedProx"]} et proxcount {matInfo[discover[0]][discover[1]]["proxCount"]}')
                 if matInfo[discover[0]][discover[1]]["clearedProx"] == matInfo[discover[0]][discover[1]]["proxCount"]:
                     status, msg, infos = c.chord(discover[0], discover[1])
                     print("chord")
@@ -333,34 +326,10 @@ def a_game(c: CrocomineClient):
                 s.add_clauses(processingInfos(infos, matInfo, borderQueue, discover_queue))
         else:
             print("C'est la merde on sait pas quoi faire, mode aléatoire")
-            x = input()
-        '''
-        moveReady = False
-        # print(borderQueue)
-        snapshot = borderQueue
-        while not moveReady:
-            if len(borderQueue) == 0:
-                print("Wtf y'a plus rien à découvrir")
-                return "OK", msg
-            border = borderQueue.pop(0)
-            moveReady, guess = makeHypothesis(border[0], border[1], s)
-            if moveReady:
-                if guess == "N":
-                    # status, msg, infos = c.discover(border[0], border[1])
-                    moveQueue.append((border[0], border[1]))
-                    moveReady = False
-                else:
-                    status, msg, infos = c.guess(border[0], border[1], guess)
-            else:
-                borderQueue.append(border)
-            if borderQueue == snapshot and len(moveQueue) != 0:
-                # on tente un chord
-                print("on discover")
-                move = moveQueue.pop(0)
-                status, msg, infos = c.discover(move[0], move[1])
-            elif borderQueue == snapshot:
-                print("Cas de hasard...")
-        '''
+            # x = input()
+            x = "next"
+            if x == "next":
+                return "KO", "cas aléatoire need fix"
     return status, msg
 
 
@@ -371,7 +340,11 @@ if __name__ == '__main__':
     members = "Styvain et Blouis"
     croco = CrocomineClient(server, group, members)
     status = "OK"
+    t = Timer()
+    t.start()
     while status != "Err":
         status, msg = a_game(croco)
-        if (status == "KO"):
+        t.lap()
+        if status != "GG":
             print(f"On s'est prix un KO")
+    t.stop()
