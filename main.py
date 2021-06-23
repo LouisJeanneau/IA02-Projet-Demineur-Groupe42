@@ -171,62 +171,61 @@ def createGridConstraint(m: int, n: int) -> List[List[int]]:
     return res
 
 
-def processingInfos(infos, mat, borderQueue: List[Tuple[int, int]], discover_queue) -> List[List[int]]:
+def processingInfos(infos, mat, borderQueue: List[Tuple[int, int]], discover_queue : List[Tuple[int, int]], chord_queue) -> List[List[int]]:
     res: List[List[int]] = []
     if not infos:
         return res
+
     for info in infos:
         i = info["pos"][0]
         j = info["pos"][1]
-        # on precise l'info du type de terrain
-        mat[i][j]["isFieldKnown"] = True
-        mat[i][j]["fieldType"] = info["field"]
-        # on code les contraintes liees au terrain
-        res.extend(codeFieldConstraint(i, j, info["field"]))
+        if not "prox_count" in info and not "animal" in info:
+            # on precise l'info du type de terrain
+            mat[i][j]["isFieldKnown"] = True
+            mat[i][j]["fieldType"] = info["field"]
+            # on code les contraintes liees au terrain
+            res.extend(codeFieldConstraint(i, j, info["field"]))
 
-        if "prox_count" in info:
-            # la case en question est safe
-            mat[i][j]["hasBeenCleared"] = True
-            mat[i][j]["content"] = "safe"
-            mat[i][j]["prox_count"] = list(info["prox_count"])
-            neighbours = getNeighbours(i, j)
-            for neighbour in neighbours:
-                mat[neighbour[0]][neighbour[1]]["cleared_neighbours"] += 1
-                if mat[neighbour[0]][neighbour[1]]["cleared_neighbours"] == mat[neighbour[0]][neighbour[1]][
-                    "neighbours"]:
-                    mat[neighbour[0]][neighbour[1]]["discovered_border"] = False
-            mat[i][j]["isBorder"] = False
-            res.append([cellToVariable(i, j, n, "N")])
-            for a in range(3):
-                res.extend(codeNeighboursConstraint(neighbours, info["prox_count"][a], corres[a]))
-            res.extend(codeNeighboursConstraint(neighbours, len(neighbours) - sum(info["prox_count"]), "N"))
-            if sum(info["prox_count"]) == 0:
-                for neighbour in neighbours:
-                    if neighbour in borderQueue:
-                        borderQueue.remove(neighbour)
-                    if neighbour in discover_queue:
-                        discover_queue.remove(neighbour)
-
-
-        elif "animal" in info:
-            # la case en question est un animal
-            neighbours = getNeighbours(i, j)
-            mat[i][j]["hasBeenCleared"] = True
-            mat[i][j]["content"] = info["animal"]
-            for neighbour in neighbours:
-                mat[neighbour[0]][neighbour[1]]["cleared_prox"][corres.index(info["animal"])] += 1
-                mat[neighbour[0]][neighbour[1]]["cleared_neighbours"] += 1
-                if sum(mat[neighbour[0]][neighbour[1]]["prox_count"]) == sum(mat[neighbour[0]][neighbour[1]]["cleared_prox"]) \
-                        and mat[neighbour[0]][neighbour[1]]["cleared_neighbours"] < mat[neighbour[0]][neighbour[1]]["neighbours"]-1:
-                    mat[neighbour[0]][neighbour[1]]["discovered_border"] = True
-                elif mat[neighbour[0]][neighbour[1]]["cleared_neighbours"] == mat[neighbour[0]][neighbour[1]]["neighbours"]:
-                    mat[neighbour[0]][neighbour[1]]["discovered_border"] = False
-            res.append([cellToVariable(i, j, n, info["animal"])])
-        # C'est une bordure à découvrir
-        else:
             mat[i][j]["isBorder"] = True
             if borderQueue.count((i, j)) == 0:
                 borderQueue.append((i, j))
+        else:
+            # c'est un animal ou une case vide
+            mat[i][j]["hasBeenCleared"] = True
+
+
+            neighbours = getNeighbours(i, j)
+            for neighbour in neighbours:
+                mat[neighbour[0]][neighbour[1]]["cleared_neighbours"] += 1
+                if "animal" in info:
+                    mat[neighbour[0]][neighbour[1]]["cleared_prox"][corres.index(info["animal"])] += 1
+                    if sum(mat[neighbour[0]][neighbour[1]]["prox_count"]) == sum(mat[neighbour[0]][neighbour[1]]["cleared_prox"]) and mat[neighbour[0]][neighbour[1]]["cleared_neighbours"] < mat[neighbour[0]][neighbour[1]]["neighbours"] - 1:
+                        mat[neighbour[0]][neighbour[1]]["discovered_border"] = True
+                        chord_queue.append((neighbour[0], neighbour[1]))
+                if mat[neighbour[0]][neighbour[1]]["cleared_neighbours"] == mat[neighbour[0]][neighbour[1]]["neighbours"]:
+                    mat[neighbour[0]][neighbour[1]]["discovered_border"] = False
+
+            if "prox_count" in info:
+                # c'est une case vide
+                mat[i][j]["content"] = "safe"
+                mat[i][j]["prox_count"] = list(info["prox_count"])
+                mat[i][j]["isBorder"] = False
+                res.append([cellToVariable(i, j, n, "N")])
+                for a in range(3):
+                    res.extend(codeNeighboursConstraint(neighbours, info["prox_count"][a], corres[a]))
+                res.extend(codeNeighboursConstraint(neighbours, len(neighbours) - sum(info["prox_count"]), "N"))
+                if sum(info["prox_count"]) == 0:
+                    for neighbour in neighbours:
+                        if neighbour in borderQueue:
+                            borderQueue.remove(neighbour)
+                        if neighbour in discover_queue:
+                            discover_queue.remove(neighbour)
+
+            elif "animal" in info:
+                # la case en question est un animal
+                mat[i][j]["content"] = info["animal"]
+                res.append([cellToVariable(i, j, n, info["animal"])])
+
     return res
 
 
@@ -353,8 +352,9 @@ def a_game(c: CrocomineClient):
 
     discover_queue: List[Tuple[int, int]] = []
     guess_queue: List[Tuple[int, int, str]] = []
+    chord_queue: List[Tuple[int, int]] = []
 
-    s.add_clauses(processingInfos(infos, matInfo, borderQueue, discover_queue))
+    s.add_clauses(processingInfos(infos, matInfo, borderQueue, discover_queue, chord_queue))
 
     # On lance la boucle des tours
     while status != "KO" and status != "GG":
@@ -366,9 +366,13 @@ def a_game(c: CrocomineClient):
             while guess_queue:
                 guess = guess_queue.pop(0)
                 status, msg, infos = c.guess(guess[0], guess[1], guess[2])
-                s.add_clauses(processingInfos(infos, matInfo, borderQueue, discover_queue))
+                s.add_clauses(processingInfos(infos, matInfo, borderQueue, discover_queue, chord_queue))
                 matInfo[guess[0]][guess[1]]["cleared_prox"][corres.index(guess[2])] += 1
-        elif len(discover_queue) != 0:
+        while chord_queue:
+            chord = chord_queue.pop(0)
+            status, msg, infos = c.chord(chord[0], chord[1])
+            s.add_clauses(processingInfos(infos, matInfo, borderQueue, discover_queue, chord_queue))
+        if len(discover_queue) != 0:
             # on discover
             affichageMat(gridInfos, matInfo)
             affichage_cleared_neighbours(gridInfos, matInfo)
@@ -381,7 +385,7 @@ def a_game(c: CrocomineClient):
                     print("chord")
                 else:
                     status, msg, infos = c.discover(discover[0], discover[1])
-                s.add_clauses(processingInfos(infos, matInfo, borderQueue, discover_queue))
+                s.add_clauses(processingInfos(infos, matInfo, borderQueue, discover_queue, chord_queue))
         else:
             print("C'est la merde on sait pas quoi faire, mode aléatoire")
             # x = input()
