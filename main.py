@@ -163,15 +163,14 @@ def codeFieldConstraint(i, j, field: str) -> List[List[int]]:
 
 
 def createGridConstraint(m: int, n: int) -> List[List[int]]:
-    res: List[List[int]] = [[]]
-    res.pop()
+    res: List[List[int]] = []
     for i in range(m):
         for j in range(n):
             res.extend(unique([cellToVariable(i, j, n, s) for s in corres]))
     return res
 
 
-def processingInfos(infos, mat, borderQueue: List[Tuple[int, int]]) -> List[List[int]]:
+def processingInfos(infos, mat, borderQueue: List[Tuple[int, int]], discover_queue) -> List[List[int]]:
     res: List[List[int]] = []
     if not infos:
         return res
@@ -184,7 +183,7 @@ def processingInfos(infos, mat, borderQueue: List[Tuple[int, int]]) -> List[List
         if "prox_count" in info:
             mat[i][j]["hasBeenCleared"] = True
             mat[i][j]["content"] = "safe"
-            mat[i][j]["proxCount"] = info["prox_count"]
+            mat[i][j]["proxCount"] = list(info["prox_count"])
             neighbours = getNeighbours(i, j)
             mat[i][j]["isBorder"] = False
             res.append([cellToVariable(i, j, n, "N")])
@@ -195,6 +194,8 @@ def processingInfos(infos, mat, borderQueue: List[Tuple[int, int]]) -> List[List
                 for neighbour in neighbours:
                     if neighbour in borderQueue:
                         borderQueue.remove(neighbour)
+                    if neighbour in discover_queue:
+                        discover_queue.remove(neighbour)
         elif "animal" in info:
             mat[i][j]["hasBeenCleared"] = True
             mat[i][j]["content"] = info["animal"]
@@ -215,6 +216,21 @@ def makeHypothesis(i: int, j: int, s: pycryptosat.Solver) -> Tuple[int, str]:
         if not solver:
             return True, animal
     return False, "next"
+
+
+def make_multiple_hypothesis(borderQueue: List[Tuple[int, int]], s: pycryptosat.Solver) -> Tuple[
+    List[Tuple[int, int]], List[Tuple[int, int, str]]]:
+    resDiscover: List[Tuple[int, int]] = []
+    resGuess: List[Tuple[int, int, str]] = []
+    for i, j in borderQueue:
+        found_one, which = makeHypothesis(i, j, s)
+        if found_one:
+            borderQueue.remove((i,j))
+            if which == "N":
+                resDiscover.append((i, j))
+            else:
+                resGuess.append((i, j, which))
+    return resDiscover, resGuess
 
 
 # Fonction de debug
@@ -263,6 +279,7 @@ def a_game(c: CrocomineClient):
 
     # On crée une liste de case en bordure de la zone connue
     borderQueue: List[Tuple[int, int]] = []
+    moveQueue: List[Tuple[int, int]] = []
 
     # on crée un modèle de données et rentre les infos dedans
     matInfo = [[{"isFieldKnown": False,
@@ -270,8 +287,8 @@ def a_game(c: CrocomineClient):
                  "hasBeenCleared": False,
                  "content": "unknown",
                  "isBorder": False,
-                 "proxCount": (-1, -1, -1),
-                 "clearedProx": (0, 0, 0)}
+                 "proxCount": [-1, -1, -1],
+                 "clearedProx": [0, 0, 0]}
                 for j in range(gridInfos["n"])]
                for i in
                range(gridInfos["m"])]
@@ -282,23 +299,68 @@ def a_game(c: CrocomineClient):
     # pprint(infos)
     # affichageMat(gridInfos, matInfo)
     # pprint(clause)
+    discover_queue: List[Tuple[int, int]] = []
+    guess_queue: List[Tuple[int, int, str]] = []
+
+    s.add_clauses(processingInfos(infos, matInfo, borderQueue, discover_queue))
+
 
     # On lance la boucle des tours
     while status != "KO" and status != "GG":
-        s.add_clauses(processingInfos(infos, matInfo, borderQueue))
-        # write_dimacs_file(clauses_to_dimacs(clause, n * m * 4), "test.cnf")
+
+        border_snapshot = borderQueue
+
+        discover_queue_temp, guess_queue_temp = make_multiple_hypothesis(borderQueue, s)
+        discover_queue.extend(discover_queue_temp)
+        guess_queue.extend(guess_queue_temp)
+        # print(f"borderQ : {borderQueue}\ndiscoverQ : {discover_queue}\nguessQ : {guess_queue}\n\n")
+        if len(guess_queue) != 0:
+            while guess_queue:
+                guess = guess_queue.pop(0)
+                status, msg, infos = c.guess(guess[0], guess[1], guess[2])
+                s.add_clauses(processingInfos(infos, matInfo, borderQueue, discover_queue))
+                matInfo[guess[0]][guess[1]]["clearedProx"][corres.index(guess[2])] += 1
+        elif len(discover_queue) != 0:
+            # on discover
+            while discover_queue:
+                discover = discover_queue.pop(0)
+                print(f' clearedprox : {matInfo[discover[0]][discover[1]]["clearedProx"]} et proxcount {matInfo[discover[0]][discover[1]]["proxCount"]}')
+                if matInfo[discover[0]][discover[1]]["clearedProx"] == matInfo[discover[0]][discover[1]]["proxCount"]:
+                    status, msg, infos = c.chord(discover[0], discover[1])
+                    print("chord")
+                else:
+                    status, msg, infos = c.discover(discover[0], discover[1])
+                s.add_clauses(processingInfos(infos, matInfo, borderQueue, discover_queue))
+        else:
+            print("C'est la merde on sait pas quoi faire, mode aléatoire")
+            x = input()
+        '''
         moveReady = False
         # print(borderQueue)
+        snapshot = borderQueue
         while not moveReady:
+            if len(borderQueue) == 0:
+                print("Wtf y'a plus rien à découvrir")
+                return "OK", msg
             border = borderQueue.pop(0)
             moveReady, guess = makeHypothesis(border[0], border[1], s)
             if moveReady:
                 if guess == "N":
-                    status, msg, infos = c.discover(border[0], border[1])
+                    # status, msg, infos = c.discover(border[0], border[1])
+                    moveQueue.append((border[0], border[1]))
+                    moveReady = False
                 else:
                     status, msg, infos = c.guess(border[0], border[1], guess)
             else:
                 borderQueue.append(border)
+            if borderQueue == snapshot and len(moveQueue) != 0:
+                # on tente un chord
+                print("on discover")
+                move = moveQueue.pop(0)
+                status, msg, infos = c.discover(move[0], move[1])
+            elif borderQueue == snapshot:
+                print("Cas de hasard...")
+        '''
     return status, msg
 
 
