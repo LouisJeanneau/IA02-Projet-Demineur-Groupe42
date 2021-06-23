@@ -26,8 +26,8 @@ Case: {
     "fieldType" : str,
     "hasBeenSolved" : Bool,
     "content" : str,
-    "proxCount" : (int, int, int),
-    "clearedProx" : (int, int, int)
+    "prox_count" : (int, int, int),
+    "cleared_prox" : (int, int, int)
 }
 
     path de mon dossier : \Drive\01_UTC\GI02\ProjetIA02
@@ -178,14 +178,23 @@ def processingInfos(infos, mat, borderQueue: List[Tuple[int, int]], discover_que
     for info in infos:
         i = info["pos"][0]
         j = info["pos"][1]
+        # on precise l'info du type de terrain
         mat[i][j]["isFieldKnown"] = True
         mat[i][j]["fieldType"] = info["field"]
+        # on code les contraintes liees au terrain
         res.extend(codeFieldConstraint(i, j, info["field"]))
+
         if "prox_count" in info:
+            # la case en question est safe
             mat[i][j]["hasBeenCleared"] = True
             mat[i][j]["content"] = "safe"
-            mat[i][j]["proxCount"] = list(info["prox_count"])
+            mat[i][j]["prox_count"] = list(info["prox_count"])
             neighbours = getNeighbours(i, j)
+            for neighbour in neighbours:
+                mat[neighbour[0]][neighbour[1]]["cleared_neighbours"] += 1
+                if mat[neighbour[0]][neighbour[1]]["cleared_neighbours"] == mat[neighbour[0]][neighbour[1]][
+                    "neighbours"]:
+                    mat[neighbour[0]][neighbour[1]]["discovered_border"] = False
             mat[i][j]["isBorder"] = False
             res.append([cellToVariable(i, j, n, "N")])
             for a in range(3):
@@ -197,10 +206,23 @@ def processingInfos(infos, mat, borderQueue: List[Tuple[int, int]], discover_que
                         borderQueue.remove(neighbour)
                     if neighbour in discover_queue:
                         discover_queue.remove(neighbour)
+
+
         elif "animal" in info:
+            # la case en question est un animal
+            neighbours = getNeighbours(i, j)
             mat[i][j]["hasBeenCleared"] = True
             mat[i][j]["content"] = info["animal"]
+            for neighbour in neighbours:
+                mat[neighbour[0]][neighbour[1]]["cleared_prox"][corres.index(info["animal"])] += 1
+                mat[neighbour[0]][neighbour[1]]["cleared_neighbours"] += 1
+                if sum(mat[neighbour[0]][neighbour[1]]["prox_count"]) == sum(mat[neighbour[0]][neighbour[1]]["cleared_prox"]) \
+                        and mat[neighbour[0]][neighbour[1]]["cleared_neighbours"] < mat[neighbour[0]][neighbour[1]]["neighbours"]-1:
+                    mat[neighbour[0]][neighbour[1]]["discovered_border"] = True
+                elif mat[neighbour[0]][neighbour[1]]["cleared_neighbours"] == mat[neighbour[0]][neighbour[1]]["neighbours"]:
+                    mat[neighbour[0]][neighbour[1]]["discovered_border"] = False
             res.append([cellToVariable(i, j, n, info["animal"])])
+        # C'est une bordure à découvrir
         else:
             mat[i][j]["isBorder"] = True
             if borderQueue.count((i, j)) == 0:
@@ -234,13 +256,23 @@ def make_multiple_hypothesis(borderQueue: List[Tuple[int, int]], s: pycryptosat.
     return resDiscover, resGuess
 
 
+def create_discovered_border_list(matInfo):
+    return
+
+
+def optimize_discovers(discover_queue: List[Tuple[int, int]], matInfo):
+    return
+
+
 # Fonction de debug
 def affichageMat(gridInfos, matInfo):
     print("Affichage de l'état des choses")
     for i in range(gridInfos["m"]):
         for j in range(gridInfos["n"]):
             if matInfo[i][j]["hasBeenCleared"]:
-                if matInfo[i][j]["content"] == "safe":
+                if matInfo[i][j]["discovered_border"]:
+                    print("•", end=' ')
+                elif matInfo[i][j]["content"] == "safe":
                     print("O", end=' ')
                 else:
                     print(matInfo[i][j]["content"], end=' ')
@@ -253,6 +285,15 @@ def affichageMat(gridInfos, matInfo):
                 print("?", end=' ')
         print(" ")
     return
+
+
+def affichage_cleared_neighbours(gridInfos, matInfo):
+    for i in range(gridInfos["m"]):
+        for j in range(gridInfos["n"]):
+            print(f'{matInfo[i][j]["cleared_neighbours"]}', end=' ')
+        print(" ")
+    print("\n\n")
+
 
 
 # on commence une partie
@@ -287,11 +328,25 @@ def a_game(c: CrocomineClient):
                  "hasBeenCleared": False,
                  "content": "unknown",
                  "isBorder": False,
-                 "proxCount": [-1, -1, -1],
-                 "clearedProx": [0, 0, 0]}
+                 "prox_count": [-1, -1, -1],
+                 "cleared_prox": [0, 0, 0],
+                 "discovered_border": False,
+                 "neighbours": 8,
+                 "cleared_neighbours": 0}
                 for j in range(gridInfos["n"])]
                for i in
                range(gridInfos["m"])]
+
+    # Alors ici on met a jour le nombre de voisins pour les cases en bordures
+    for i in [0, m-1]:
+        for j in range(n):
+            matInfo[i][j]["neighbours"] = 5
+    for j in [0, n-1]:
+        for i in range(m):
+            matInfo[i][j]["neighbours"] = 5
+    for i, j in [(0, 0), (0, n-1), (m-1, 0), (m-1, n-1)]:
+        matInfo[i][j]["neighbours"] = 3
+
 
     # On fait un premier discover sur la case de départ
     status, msg, infos = c.discover(gridInfos["start"][0], gridInfos["start"][1])
@@ -312,13 +367,16 @@ def a_game(c: CrocomineClient):
                 guess = guess_queue.pop(0)
                 status, msg, infos = c.guess(guess[0], guess[1], guess[2])
                 s.add_clauses(processingInfos(infos, matInfo, borderQueue, discover_queue))
-                matInfo[guess[0]][guess[1]]["clearedProx"][corres.index(guess[2])] += 1
+                matInfo[guess[0]][guess[1]]["cleared_prox"][corres.index(guess[2])] += 1
         elif len(discover_queue) != 0:
             # on discover
+            affichageMat(gridInfos, matInfo)
+            affichage_cleared_neighbours(gridInfos, matInfo)
+            wait = input()
             while discover_queue:
                 discover = discover_queue.pop(0)
-                # print(f' clearedprox : {matInfo[discover[0]][discover[1]]["clearedProx"]} et proxcount {matInfo[discover[0]][discover[1]]["proxCount"]}')
-                if matInfo[discover[0]][discover[1]]["clearedProx"] == matInfo[discover[0]][discover[1]]["proxCount"]:
+                # print(f' clearedprox : {matInfo[discover[0]][discover[1]]["cleared_prox"]} et proxcount {matInfo[discover[0]][discover[1]]["prox_count"]}')
+                if matInfo[discover[0]][discover[1]]["cleared_prox"] == matInfo[discover[0]][discover[1]]["prox_count"]:
                     status, msg, infos = c.chord(discover[0], discover[1])
                     print("chord")
                 else:
