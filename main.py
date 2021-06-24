@@ -356,13 +356,12 @@ def a_game(c: CrocomineClient):
                 # print(f'discoverQ dans le chord : {discover_queue}')
         elif discover_queue and not played:
             played = True
-            while discover_queue:
-                discover = discover_queue.pop(0)
-                # print(f' clearedprox : {mat_info[discover[0]][discover[1]]["cleared_prox"]} et proxcount {mat_info[discover[0]][discover[1]]["prox_count"]}')
-                status, msg, infos = c.discover(discover[0], discover[1])
-                if status == "KO":
-                    return status, msg
-                s.add_clauses(processing_infos(infos, mat_info, border_queue, discover_queue, chord_queue))
+            discover = discover_queue.pop(0)
+            # print(f' clearedprox : {mat_info[discover[0]][discover[1]]["cleared_prox"]} et proxcount {mat_info[discover[0]][discover[1]]["prox_count"]}')
+            status, msg, infos = c.discover(discover[0], discover[1])
+            if status == "KO":
+                return status, msg
+            s.add_clauses(processing_infos(infos, mat_info, border_queue, discover_queue, chord_queue))
         if not played:
             # print("C'est la merde on sait pas quoi faire, mode aléatoire")
             # x = input()
