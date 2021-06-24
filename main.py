@@ -1,40 +1,3 @@
-'''
-types de base :
-
-Status : str
-Mgg : str
-Info: {
-    “pos”: (int, int), # (i, j) i < M, j < N
-    “field”: str # “sea”“land”
-    “prox_count”: (int, int, int) # (tiger_count, shark_count, croco_count), optional
-    }
-Infos = List[info]
-GridInfos: {
-    “m”: int,
-    “n”: int,
-    “start”: (int, int),
-    “tiger_count”: int,
-    “shark_count”: int,
-    “croco_count”: int,
-    “sea_count”: int,
-    “land_count”: int,
-    “3BV”: int,
-    “infos”: Infos # Optional
-    }
-Case: {
-    "isFieldKnown" : Bool,
-    "fieldType" : str,
-    "hasBeenSolved" : Bool,
-    "content" : str,
-    "prox_count" : (int, int, int),
-    "cleared_prox" : (int, int, int)
-}
-
-    path de mon dossier : \Drive\01_UTC\GI02\ProjetIA02
-        commande cmd : .\serveur\win64\crocomine-lite-beta4.exe :8000 .\serveur\grilles\
-        ./serveur/win64/crocomine-lite-beta4.exe :8000 ./serveur/grilles/
-
-'''
 import os
 from client.crocomine_client import CrocomineClient
 from typing import List, Tuple
@@ -69,7 +32,6 @@ def append_dimacs_file(dimacs: str, filename: str):
 
 # Supprime la derniere ligne du fichier
 def truncate_dimacs_file(filename: str):
-    position = 0
     with open(filename) as cnf:
         cnf.seek(0, os.SEEK_END)
         position = cnf.tell()
@@ -113,11 +75,11 @@ def clauses_to_dimacs(clauses: List[List[int]], nb_vars: int):
 
 
 # FONCTION MAISON POUR CODER LE SAT
-def cellToVariable(i: int, j: int, n: int, animal: str) -> int:
+def cell_to_variable(i: int, j: int, n: int, animal: str) -> int:
     return i * n * 4 + j * 4 + corres.index(animal) + 1
 
 
-def variableToCell(n: int, var: int) -> Tuple[Tuple[int, int], str]:
+def variable_to_cell(n: int, var: int) -> Tuple[Tuple[int, int], str]:
     v = var - 1
     return (v // (4 * n), v // 4), corres[v % 4]
 
@@ -126,7 +88,7 @@ def unique(variables: List[int]) -> List[List[int]]:
     return [variables[:]] + [list(a) for a in combinations([-x for x in variables], 2)]
 
 
-def exactlyOutOf(variables: List[int], k: int) -> List[List[int]]:
+def exactly_out_of(variables: List[int], k: int) -> List[List[int]]:
     if k == 0:
         return [list(a) for a in combinations([-x for x in variables], 1)]
     if k == len(variables):
@@ -138,7 +100,7 @@ def exactlyOutOf(variables: List[int], k: int) -> List[List[int]]:
     return res
 
 
-def getNeighbours(i: int, j: int) -> List[Tuple[int, int]]:
+def get_neighbours(i: int, j: int, m: int, n: int) -> List[Tuple[int, int]]:
     res: List[Tuple[int, int]] = [(0, 0)]
     res.pop()
     for (k, l) in voisins:
@@ -148,30 +110,31 @@ def getNeighbours(i: int, j: int) -> List[Tuple[int, int]]:
     return res
 
 
-def codeNeighboursConstraint(neighbours: List[Tuple[int, int]], k: int, animal: str) -> List[List[int]]:
+def code_neighbours_constraint(neighbours: List[Tuple[int, int]], n: int, k: int, animal: str) -> List[List[int]]:
     var: List[int] = []
     for (i, j) in neighbours:
-        var.append(cellToVariable(i, j, n, animal))
-    return exactlyOutOf(var, k)
+        var.append(cell_to_variable(i, j, n, animal))
+    return exactly_out_of(var, k)
 
 
-def codeFieldConstraint(i, j, field: str) -> List[List[int]]:
+def code_field_constraint(i, j, n: int, field: str) -> List[List[int]]:
     if field == "sea":
-        return [[-cellToVariable(i, j, n, "T")]]
+        return [[-cell_to_variable(i, j, n, "T")]]
     if field == "land":
-        return [[-cellToVariable(i, j, n, "S")]]
+        return [[-cell_to_variable(i, j, n, "S")]]
     return []
 
 
-def createGridConstraint(m: int, n: int) -> List[List[int]]:
+def create_grid_constraint(m: int, n: int) -> List[List[int]]:
     res: List[List[int]] = []
     for i in range(m):
         for j in range(n):
-            res.extend(unique([cellToVariable(i, j, n, s) for s in corres]))
+            res.extend(unique([cell_to_variable(i, j, n, s) for s in corres]))
     return res
 
 
-def processingInfos(infos, mat, borderQueue: List[Tuple[int, int]], discover_queue : List[Tuple[int, int]], chord_queue) -> List[List[int]]:
+def processing_infos(infos, mat, borderQueue: List[Tuple[int, int]], discover_queue: List[Tuple[int, int]],
+                     chord_queue) -> List[List[int]]:
     res: List[List[int]] = []
     if not infos:
         return res
@@ -184,7 +147,7 @@ def processingInfos(infos, mat, borderQueue: List[Tuple[int, int]], discover_que
             mat[i][j]["isFieldKnown"] = True
             mat[i][j]["fieldType"] = info["field"]
             # on code les contraintes liees au terrain
-            res.extend(codeFieldConstraint(i, j, info["field"]))
+            res.extend(code_field_constraint(i, j, len(mat[0]), info["field"]))
 
             mat[i][j]["isBorder"] = True
             if borderQueue.count((i, j)) == 0:
@@ -195,15 +158,18 @@ def processingInfos(infos, mat, borderQueue: List[Tuple[int, int]], discover_que
             if discover_queue.count((i, j)):
                 discover_queue.remove((i, j))
 
-            neighbours = getNeighbours(i, j)
+            neighbours = get_neighbours(i, j, len(mat), len(mat[0]))
             for neighbour in neighbours:
                 mat[neighbour[0]][neighbour[1]]["cleared_neighbours"] += 1
                 if "animal" in info:
                     mat[neighbour[0]][neighbour[1]]["cleared_prox"][corres.index(info["animal"])] += 1
-                    if sum(mat[neighbour[0]][neighbour[1]]["prox_count"]) == sum(mat[neighbour[0]][neighbour[1]]["cleared_prox"]) and mat[neighbour[0]][neighbour[1]]["cleared_neighbours"] < mat[neighbour[0]][neighbour[1]]["neighbours"] - 1:
+                    if sum(mat[neighbour[0]][neighbour[1]]["prox_count"]) == sum(
+                            mat[neighbour[0]][neighbour[1]]["cleared_prox"]) and mat[neighbour[0]][neighbour[1]][
+                        "cleared_neighbours"] < mat[neighbour[0]][neighbour[1]]["neighbours"] - 1:
                         mat[neighbour[0]][neighbour[1]]["discovered_border"] = True
                         chord_queue.append((neighbour[0], neighbour[1]))
-                if mat[neighbour[0]][neighbour[1]]["cleared_neighbours"] == mat[neighbour[0]][neighbour[1]]["neighbours"]:
+                if mat[neighbour[0]][neighbour[1]]["cleared_neighbours"] == mat[neighbour[0]][neighbour[1]][
+                    "neighbours"]:
                     mat[neighbour[0]][neighbour[1]]["discovered_border"] = False
 
             if "prox_count" in info:
@@ -211,10 +177,10 @@ def processingInfos(infos, mat, borderQueue: List[Tuple[int, int]], discover_que
                 mat[i][j]["content"] = "safe"
                 mat[i][j]["prox_count"] = list(info["prox_count"])
                 mat[i][j]["isBorder"] = False
-                res.append([cellToVariable(i, j, n, "N")])
+                res.append([cell_to_variable(i, j, len(mat[0]), "N")])
                 for a in range(3):
-                    res.extend(codeNeighboursConstraint(neighbours, info["prox_count"][a], corres[a]))
-                res.extend(codeNeighboursConstraint(neighbours, len(neighbours) - sum(info["prox_count"]), "N"))
+                    res.extend(code_neighbours_constraint(neighbours, len(mat[0]), info["prox_count"][a], corres[a]))
+                res.extend(code_neighbours_constraint(neighbours, len(mat[0]), len(neighbours) - sum(info["prox_count"]), "N"))
                 if sum(info["prox_count"]) == 0:
                     for neighbour in neighbours:
                         if neighbour in borderQueue:
@@ -225,15 +191,15 @@ def processingInfos(infos, mat, borderQueue: List[Tuple[int, int]], discover_que
             elif "animal" in info:
                 # la case en question est un animal
                 mat[i][j]["content"] = info["animal"]
-                res.append([cellToVariable(i, j, n, info["animal"])])
+                res.append([cell_to_variable(i, j, len(mat[0]), info["animal"])])
 
     return res
 
 
-def makeHypothesis(i: int, j: int, s: pycryptosat.Solver) -> Tuple[int, str]:
+def make_hypothesis(i: int, j: int, n: int, s: pycryptosat.Solver) -> Tuple[int, str]:
     for animal in corres:
         # append_dimacs_file(str(-cellToVariable(i, j, n, animal)) + " 0\n", "test.cnf")
-        solver, trash = s.solve([-cellToVariable(i, j, n, animal)])
+        solver, trash = s.solve([-cell_to_variable(i, j, n, animal)])
         # solver, trash = exec_gophersat("test.cnf")
         # print(f'resultat du solver sur i={i} j={j} avec animal {animal} :   {solver}')
         if not solver:
@@ -241,12 +207,12 @@ def makeHypothesis(i: int, j: int, s: pycryptosat.Solver) -> Tuple[int, str]:
     return False, "next"
 
 
-def make_multiple_hypothesis(borderQueue: List[Tuple[int, int]], s: pycryptosat.Solver) -> Tuple[
+def make_multiple_hypothesis(borderQueue: List[Tuple[int, int]], n: int, s: pycryptosat.Solver) -> Tuple[
     List[Tuple[int, int]], List[Tuple[int, int, str]]]:
     resDiscover: List[Tuple[int, int]] = []
     resGuess: List[Tuple[int, int, str]] = []
     for i, j in borderQueue:
-        found_one, which = makeHypothesis(i, j, s)
+        found_one, which = make_hypothesis(i, j, n, s)
         if found_one:
             borderQueue.remove((i, j))
             if which == "N":
@@ -265,7 +231,7 @@ def optimize_discovers(discover_queue: List[Tuple[int, int]], matInfo):
 
 
 # Fonction de debug
-def affichageMat(gridInfos, matInfo):
+def affichage_mat(gridInfos, matInfo):
     print("Affichage de l'état des choses")
     for i in range(gridInfos["m"]):
         for j in range(gridInfos["n"]):
@@ -295,7 +261,6 @@ def affichage_cleared_neighbours(gridInfos, matInfo):
     print("\n\n")
 
 
-
 # on commence une partie
 def a_game(c: CrocomineClient):
     # on demande la nouvelle carte
@@ -307,46 +272,43 @@ def a_game(c: CrocomineClient):
         return status, msg
 
     # sinon on récupère la taille de la map
-    global m
     m = gridInfos["m"]
-    global n
     n = gridInfos["n"]
 
     # On crée une liste dynamique des clauses
     clause: List[List[int]] = []
-    clause.extend(createGridConstraint(m, n))
+    clause.extend(create_grid_constraint(m, n))
 
     s = pycryptosat.Solver()
     s.add_clauses(clause)
 
     # On crée une liste de case en bordure de la zone connue
-    borderQueue: List[Tuple[int, int]] = []
+    border_queue: List[Tuple[int, int]] = []
 
     # on crée un modèle de données et rentre les infos dedans
-    matInfo = [[{"isFieldKnown": False,
-                 "fieldType": "unknown",
-                 "hasBeenCleared": False,
-                 "content": "unknown",
-                 "isBorder": False,
-                 "prox_count": [-1, -1, -1],
-                 "cleared_prox": [0, 0, 0],
-                 "discovered_border": False,
-                 "neighbours": 8,
-                 "cleared_neighbours": 0}
-                for j in range(gridInfos["n"])]
-               for i in
-               range(gridInfos["m"])]
+    mat_info = [[{"isFieldKnown": False,
+                  "fieldType": "unknown",
+                  "hasBeenCleared": False,
+                  "content": "unknown",
+                  "isBorder": False,
+                  "prox_count": [-1, -1, -1],
+                  "cleared_prox": [0, 0, 0],
+                  "discovered_border": False,
+                  "neighbours": 8,
+                  "cleared_neighbours": 0}
+                 for j in range(gridInfos["n"])]
+                for i in
+                range(gridInfos["m"])]
 
     # Alors ici on met a jour le nombre de voisins pour les cases en bordures
-    for i in [0, m-1]:
+    for i in [0, m - 1]:
         for j in range(n):
-            matInfo[i][j]["neighbours"] = 5
-    for j in [0, n-1]:
+            mat_info[i][j]["neighbours"] = 5
+    for j in [0, n - 1]:
         for i in range(m):
-            matInfo[i][j]["neighbours"] = 5
-    for i, j in [(0, 0), (0, n-1), (m-1, 0), (m-1, n-1)]:
-        matInfo[i][j]["neighbours"] = 3
-
+            mat_info[i][j]["neighbours"] = 5
+    for i, j in [(0, 0), (0, n - 1), (m - 1, 0), (m - 1, n - 1)]:
+        mat_info[i][j]["neighbours"] = 3
 
     # On fait un premier discover sur la case de départ
     status, msg, infos = c.discover(gridInfos["start"][0], gridInfos["start"][1])
@@ -355,14 +317,14 @@ def a_game(c: CrocomineClient):
     guess_queue: List[Tuple[int, int, str]] = []
     chord_queue: List[Tuple[int, int]] = []
 
-    s.add_clauses(processingInfos(infos, matInfo, borderQueue, discover_queue, chord_queue))
+    s.add_clauses(processing_infos(infos, mat_info, border_queue, discover_queue, chord_queue))
 
     # On lance la boucle des tours
     while status != "KO" and status != "GG":
-        discover_queue_temp, guess_queue_temp = make_multiple_hypothesis(borderQueue, s)
+        discover_queue_temp, guess_queue_temp = make_multiple_hypothesis(border_queue, n, s)
         discover_queue.extend(discover_queue_temp)
         guess_queue.extend(guess_queue_temp)
-        # print(f"borderQ : {borderQueue}\ndiscoverQ : {discover_queue}\nguessQ : {guess_queue}\n")
+        # print(f"borderQ : {border_queue}\ndiscoverQ : {discover_queue}\nguessQ : {guess_queue}\n")
         played = False
         while guess_queue:
             played = True
@@ -370,8 +332,8 @@ def a_game(c: CrocomineClient):
             status, msg, infos = c.guess(guess[0], guess[1], guess[2])
             if status == "KO":
                 return status, msg
-            s.add_clauses(processingInfos(infos, matInfo, borderQueue, discover_queue, chord_queue))
-            matInfo[guess[0]][guess[1]]["cleared_prox"][corres.index(guess[2])] += 1
+            s.add_clauses(processing_infos(infos, mat_info, border_queue, discover_queue, chord_queue))
+            mat_info[guess[0]][guess[1]]["cleared_prox"][corres.index(guess[2])] += 1
         while chord_queue:
             played = True
             # print(f'chordQ : {chord_queue}')
@@ -379,22 +341,22 @@ def a_game(c: CrocomineClient):
             status, msg, infos = c.chord(chord[0], chord[1])
             if status == "KO":
                 return status, msg
-            neighbours = getNeighbours(chord[0], chord[1])
+            neighbours = get_neighbours(chord[0], chord[1], m, n)
             for neighbour in neighbours:
                 if discover_queue.count(neighbour):
                     discover_queue.remove(neighbour)
-                if neighbour in borderQueue:
-                    borderQueue.remove(neighbour)
-            s.add_clauses(processingInfos(infos, matInfo, borderQueue, discover_queue, chord_queue))
+                if neighbour in border_queue:
+                    border_queue.remove(neighbour)
+            s.add_clauses(processing_infos(infos, mat_info, border_queue, discover_queue, chord_queue))
             # print(f'discoverQ dans le chord : {discover_queue}')
         while discover_queue and not played:
             played = True
             discover = discover_queue.pop(0)
-            # print(f' clearedprox : {matInfo[discover[0]][discover[1]]["cleared_prox"]} et proxcount {matInfo[discover[0]][discover[1]]["prox_count"]}')
+            # print(f' clearedprox : {mat_info[discover[0]][discover[1]]["cleared_prox"]} et proxcount {mat_info[discover[0]][discover[1]]["prox_count"]}')
             status, msg, infos = c.discover(discover[0], discover[1])
             if status == "KO":
                 return status, msg
-            s.add_clauses(processingInfos(infos, matInfo, borderQueue, discover_queue, chord_queue))
+            s.add_clauses(processing_infos(infos, mat_info, border_queue, discover_queue, chord_queue))
         if not played:
             # print("C'est la merde on sait pas quoi faire, mode aléatoire")
             # x = input()
