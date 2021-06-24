@@ -192,7 +192,8 @@ def processingInfos(infos, mat, borderQueue: List[Tuple[int, int]], discover_que
         else:
             # c'est un animal ou une case vide
             mat[i][j]["hasBeenCleared"] = True
-
+            if discover_queue.count((i, j)):
+                discover_queue.remove((i, j))
 
             neighbours = getNeighbours(i, j)
             for neighbour in neighbours:
@@ -361,32 +362,40 @@ def a_game(c: CrocomineClient):
         discover_queue_temp, guess_queue_temp = make_multiple_hypothesis(borderQueue, s)
         discover_queue.extend(discover_queue_temp)
         guess_queue.extend(guess_queue_temp)
-        # print(f"borderQ : {borderQueue}\ndiscoverQ : {discover_queue}\nguessQ : {guess_queue}\n\n")
-        if len(guess_queue) != 0:
-            while guess_queue:
-                guess = guess_queue.pop(0)
-                status, msg, infos = c.guess(guess[0], guess[1], guess[2])
-                s.add_clauses(processingInfos(infos, matInfo, borderQueue, discover_queue, chord_queue))
-                matInfo[guess[0]][guess[1]]["cleared_prox"][corres.index(guess[2])] += 1
+        print(f"borderQ : {borderQueue}\ndiscoverQ : {discover_queue}\nguessQ : {guess_queue}\n")
+        played = False
+        while guess_queue:
+            played = True
+            guess = guess_queue.pop(0)
+            status, msg, infos = c.guess(guess[0], guess[1], guess[2])
+            if status == "KO":
+                return status, msg
+            s.add_clauses(processingInfos(infos, matInfo, borderQueue, discover_queue, chord_queue))
+            matInfo[guess[0]][guess[1]]["cleared_prox"][corres.index(guess[2])] += 1
         while chord_queue:
+            played = True
+            print(f'chordQ : {chord_queue}')
             chord = chord_queue.pop(0)
             status, msg, infos = c.chord(chord[0], chord[1])
+            if status == "KO":
+                return status, msg
+            neighbours = getNeighbours(chord[0], chord[1])
+            for neighbour in neighbours:
+                if discover_queue.count(neighbour):
+                    discover_queue.remove(neighbour)
+                if neighbour in borderQueue:
+                    borderQueue.remove(neighbour)
             s.add_clauses(processingInfos(infos, matInfo, borderQueue, discover_queue, chord_queue))
-        if len(discover_queue) != 0:
-            # on discover
-            affichageMat(gridInfos, matInfo)
-            affichage_cleared_neighbours(gridInfos, matInfo)
-            wait = input()
-            while discover_queue:
-                discover = discover_queue.pop(0)
-                # print(f' clearedprox : {matInfo[discover[0]][discover[1]]["cleared_prox"]} et proxcount {matInfo[discover[0]][discover[1]]["prox_count"]}')
-                if matInfo[discover[0]][discover[1]]["cleared_prox"] == matInfo[discover[0]][discover[1]]["prox_count"]:
-                    status, msg, infos = c.chord(discover[0], discover[1])
-                    print("chord")
-                else:
-                    status, msg, infos = c.discover(discover[0], discover[1])
-                s.add_clauses(processingInfos(infos, matInfo, borderQueue, discover_queue, chord_queue))
-        else:
+            print(f'discoverQ dans le chord : {discover_queue}')
+        while discover_queue:
+            played = True
+            discover = discover_queue.pop(0)
+            # print(f' clearedprox : {matInfo[discover[0]][discover[1]]["cleared_prox"]} et proxcount {matInfo[discover[0]][discover[1]]["prox_count"]}')
+            status, msg, infos = c.discover(discover[0], discover[1])
+            if status == "KO":
+                return status, msg
+            s.add_clauses(processingInfos(infos, matInfo, borderQueue, discover_queue, chord_queue))
+        if not played:
             print("C'est la merde on sait pas quoi faire, mode aléatoire")
             # x = input()
             x = "next"
