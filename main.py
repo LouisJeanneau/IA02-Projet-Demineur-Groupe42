@@ -362,7 +362,7 @@ def a_game(c: CrocomineClient):
         discover_queue_temp, guess_queue_temp = make_multiple_hypothesis(borderQueue, s)
         discover_queue.extend(discover_queue_temp)
         guess_queue.extend(guess_queue_temp)
-        print(f"borderQ : {borderQueue}\ndiscoverQ : {discover_queue}\nguessQ : {guess_queue}\n")
+        # print(f"borderQ : {borderQueue}\ndiscoverQ : {discover_queue}\nguessQ : {guess_queue}\n")
         played = False
         while guess_queue:
             played = True
@@ -374,7 +374,7 @@ def a_game(c: CrocomineClient):
             matInfo[guess[0]][guess[1]]["cleared_prox"][corres.index(guess[2])] += 1
         while chord_queue:
             played = True
-            print(f'chordQ : {chord_queue}')
+            # print(f'chordQ : {chord_queue}')
             chord = chord_queue.pop(0)
             status, msg, infos = c.chord(chord[0], chord[1])
             if status == "KO":
@@ -386,7 +386,7 @@ def a_game(c: CrocomineClient):
                 if neighbour in borderQueue:
                     borderQueue.remove(neighbour)
             s.add_clauses(processingInfos(infos, matInfo, borderQueue, discover_queue, chord_queue))
-            print(f'discoverQ dans le chord : {discover_queue}')
+            # print(f'discoverQ dans le chord : {discover_queue}')
         while discover_queue and not played:
             played = True
             discover = discover_queue.pop(0)
@@ -396,7 +396,7 @@ def a_game(c: CrocomineClient):
                 return status, msg
             s.add_clauses(processingInfos(infos, matInfo, borderQueue, discover_queue, chord_queue))
         if not played:
-            print("C'est la merde on sait pas quoi faire, mode aléatoire")
+            # print("C'est la merde on sait pas quoi faire, mode aléatoire")
             # x = input()
             x = "next"
             if x == "next":
