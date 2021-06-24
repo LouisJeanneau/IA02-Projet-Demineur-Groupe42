@@ -387,7 +387,7 @@ def a_game(c: CrocomineClient):
                     borderQueue.remove(neighbour)
             s.add_clauses(processingInfos(infos, matInfo, borderQueue, discover_queue, chord_queue))
             print(f'discoverQ dans le chord : {discover_queue}')
-        while discover_queue:
+        while discover_queue and not played:
             played = True
             discover = discover_queue.pop(0)
             # print(f' clearedprox : {matInfo[discover[0]][discover[1]]["cleared_prox"]} et proxcount {matInfo[discover[0]][discover[1]]["prox_count"]}')
