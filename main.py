@@ -133,8 +133,8 @@ def create_grid_constraint(m: int, n: int) -> List[List[int]]:
     return res
 
 
-def processing_infos(infos, mat, borderQueue: List[Tuple[int, int]], discover_queue: List[Tuple[int, int]],
-                     chord_queue) -> List[List[int]]:
+def processing_infos(infos, mat, border_queue: List[Tuple[int, int]], discover_queue: List[Tuple[int, int]],
+                     chord_queue: List[Tuple[Tuple[int, int], int]]) -> List[List[int]]:
     res: List[List[int]] = []
     if not infos:
         return res
@@ -150,8 +150,8 @@ def processing_infos(infos, mat, borderQueue: List[Tuple[int, int]], discover_qu
             res.extend(code_field_constraint(i, j, len(mat[0]), info["field"]))
 
             mat[i][j]["isBorder"] = True
-            if borderQueue.count((i, j)) == 0:
-                borderQueue.append((i, j))
+            if border_queue.count((i, j)) == 0:
+                border_queue.append((i, j))
         else:
             # c'est un animal ou une case vide
             mat[i][j]["hasBeenCleared"] = True
@@ -180,16 +180,18 @@ def processing_infos(infos, mat, borderQueue: List[Tuple[int, int]], discover_qu
                 res.append([cell_to_variable(i, j, len(mat[0]), "N")])
                 for a in range(3):
                     res.extend(code_neighbours_constraint(neighbours, len(mat[0]), info["prox_count"][a], corres[a]))
-                res.extend(code_neighbours_constraint(neighbours, len(mat[0]), len(neighbours) - sum(info["prox_count"]), "N"))
+                res.extend(
+                    code_neighbours_constraint(neighbours, len(mat[0]), len(neighbours) - sum(info["prox_count"]), "N"))
                 if sum(info["prox_count"]) == 0:
                     for neighbour in neighbours:
-                        if neighbour in borderQueue:
-                            borderQueue.remove(neighbour)
+                        if neighbour in border_queue:
+                            border_queue.remove(neighbour)
                         if neighbour in discover_queue:
                             discover_queue.remove(neighbour)
 
             elif "animal" in info:
                 # la case en question est un animal
+                mat[i][j]["cleared_prox"][corres.index(info["animal"])] += 1
                 mat[i][j]["content"] = info["animal"]
                 res.append([cell_to_variable(i, j, len(mat[0]), info["animal"])])
 
@@ -207,14 +209,14 @@ def make_hypothesis(i: int, j: int, n: int, s: pycryptosat.Solver) -> Tuple[int,
     return False, "next"
 
 
-def make_multiple_hypothesis(borderQueue: List[Tuple[int, int]], n: int, s: pycryptosat.Solver) -> Tuple[
+def make_multiple_hypothesis(border_queue: List[Tuple[int, int]], n: int, s: pycryptosat.Solver) -> Tuple[
     List[Tuple[int, int]], List[Tuple[int, int, str]]]:
     resDiscover: List[Tuple[int, int]] = []
     resGuess: List[Tuple[int, int, str]] = []
-    for i, j in borderQueue:
+    for i, j in border_queue:
         found_one, which = make_hypothesis(i, j, n, s)
         if found_one:
-            borderQueue.remove((i, j))
+            border_queue.remove((i, j))
             if which == "N":
                 resDiscover.append((i, j))
             else:
@@ -315,7 +317,7 @@ def a_game(c: CrocomineClient):
 
     discover_queue: List[Tuple[int, int]] = []
     guess_queue: List[Tuple[int, int, str]] = []
-    chord_queue: List[Tuple[int, int]] = []
+    chord_queue: List[Tuple[Tuple[int, int], int]] = []
 
     s.add_clauses(processing_infos(infos, mat_info, border_queue, discover_queue, chord_queue))
 
@@ -333,9 +335,9 @@ def a_game(c: CrocomineClient):
             if status == "KO":
                 return status, msg
             s.add_clauses(processing_infos(infos, mat_info, border_queue, discover_queue, chord_queue))
-            mat_info[guess[0]][guess[1]]["cleared_prox"][corres.index(guess[2])] += 1
         while chord_queue:
             played = True
+            chord_queue.sort(key= lambda ch: ch[1])
             # print(f'chordQ : {chord_queue}')
             chord = chord_queue.pop(0)
             status, msg, infos = c.chord(chord[0], chord[1])
