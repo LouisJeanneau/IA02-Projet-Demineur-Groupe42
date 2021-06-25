@@ -1,5 +1,5 @@
 import os
-from client.crocomine_client import CrocomineClient
+import client.crocomine_client
 from typing import List, Tuple
 import subprocess
 from itertools import combinations
@@ -267,7 +267,7 @@ def affichage_cleared_neighbours(gridInfos, matInfo):
 
 
 # on commence une partie
-def a_game(c: CrocomineClient):
+def a_game(c: client.crocomine_client.CrocomineClient):
     # on demande la nouvelle carte
     status, msg, gridInfos = c.new_grid()
 
@@ -341,7 +341,9 @@ def a_game(c: CrocomineClient):
                 s.add_clauses(processing_infos(infos, mat_info, border_queue, discover_queue, chord_queue))
         elif chord_queue:
             played = True
-            chord_queue.sort(key=lambda ch: ch[1])
+            print(f"chordQ non triée: {chord_queue}\n")
+            chord_queue.sort(key=lambda ch: ch[1], reverse=True)
+            print(f"chordQ non triée: {chord_queue}\n")
             while chord_queue:
                 # print(f'chordQ : {chord_queue}')
                 chord = chord_queue.pop(0)
@@ -366,8 +368,21 @@ def a_game(c: CrocomineClient):
             s.add_clauses(processing_infos(infos, mat_info, border_queue, discover_queue, chord_queue))
         if not played:
             print("C'est la merde on sait pas quoi faire, mode aléatoire")
+            border = border_queue.pop(0)
+            sat, solution = s.solve()
+            interest = solution[cell_to_variable(border[0], border[1], n, "T"):cell_to_variable(border[0], border[1], n, "N")+1]
+            print(interest)
+            for var in range(3):
+                if interest[var] == True:
+                    played = True
+                    status, msg, infos = c.guess(border[0], border[1], corres[var])
+            if interest[3] == True:
+                played = True
+                status, msg, infos = c.discover(border[0], border[1])
+            s.add_clauses(processing_infos(infos, mat_info, border_queue, discover_queue, chord_queue))
             # x = input()
-            x = "next"
+            # x = "next"
+            x = "a"
             if x == "next":
                 return "KO", "cas aléatoire need fix"
     return status, msg
@@ -378,7 +393,7 @@ if __name__ == '__main__':
     server = "http://localhost:8000"
     group = "Groupe 42"
     members = "Styvain et Blouis"
-    croco = CrocomineClient(server, group, members)
+    croco = client.crocomine_client.CrocomineClient(server, group, members, False)
     status = "OK"
     t = Timer()
     t.start()

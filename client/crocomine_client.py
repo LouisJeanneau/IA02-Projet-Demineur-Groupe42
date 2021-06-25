@@ -116,5 +116,6 @@ class CrocomineClient:
         res = self._request("chord", data)
 
         if res["status"] != "OK" or not "infos" in res:
+            print("chord inutile\n")
             return res["status"], res["msg"], []
         return res["status"], res["msg"], res["infos"]
