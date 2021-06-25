@@ -341,9 +341,9 @@ def a_game(c: client.crocomine_client.CrocomineClient):
                 s.add_clauses(processing_infos(infos, mat_info, border_queue, discover_queue, chord_queue))
         elif chord_queue:
             played = True
-            print(f"chordQ non triée: {chord_queue}\n")
+            # print(f"chordQ non triée: {chord_queue}\n")
             chord_queue.sort(key=lambda ch: ch[1], reverse=True)
-            print(f"chordQ non triée: {chord_queue}\n")
+            # print(f"chordQ non triée: {chord_queue}\n")
             while chord_queue:
                 # print(f'chordQ : {chord_queue}')
                 chord = chord_queue.pop(0)
