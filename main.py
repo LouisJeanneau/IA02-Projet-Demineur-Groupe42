@@ -405,4 +405,5 @@ if __name__ == '__main__':
         t.lap()
         if status != "GG":
             print(f"On s'est prix un KO")
+        print("\n\n")
     t.stop()
