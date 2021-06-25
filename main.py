@@ -5,6 +5,8 @@ import subprocess
 from itertools import combinations
 import pycryptosat
 from helpers.timer import Timer, TimerError
+from multiprocessing import Process
+import sys
 
 voisins = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
 corres = ["T", "S", "C", "N"]
@@ -327,7 +329,7 @@ def a_game(c: CrocomineClient):
         discover_queue_temp, guess_queue_temp = make_multiple_hypothesis(border_queue, n, s)
         discover_queue.extend(discover_queue_temp)
         guess_queue.extend(guess_queue_temp)
-        # print(f"borderQ : {border_queue}\ndiscoverQ : {discover_queue}\nguessQ : {guess_queue}\n")
+        print(f"borderQ : {border_queue}\nchordQ : {chord_queue}\ndiscoverQ : {discover_queue}\nguessQ : {guess_queue}\n\n")
         played = False
         if guess_queue:
             played = True
@@ -363,9 +365,9 @@ def a_game(c: CrocomineClient):
                 return status, msg
             s.add_clauses(processing_infos(infos, mat_info, border_queue, discover_queue, chord_queue))
         if not played:
-            # print("C'est la merde on sait pas quoi faire, mode aléatoire")
-            # x = input()
-            x = "next"
+            print("C'est la merde on sait pas quoi faire, mode aléatoire")
+            x = input()
+            # x = "next"
             if x == "next":
                 return "KO", "cas aléatoire need fix"
     return status, msg
