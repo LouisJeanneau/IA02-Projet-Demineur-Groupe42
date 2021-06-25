@@ -1,6 +1,4 @@
 import os
-import random
-
 from client.crocomine_client import CrocomineClient
 from typing import List, Tuple
 import subprocess
@@ -368,11 +366,10 @@ def a_game(c: CrocomineClient):
             s.add_clauses(processing_infos(infos, mat_info, border_queue, discover_queue, chord_queue))
         if not played:
             print("C'est la merde on sait pas quoi faire, mode aléatoire")
-            c.discover(random.randint(0, n - 1), random.randint(0, m - 1))
-            # x = input()
+            x = input()
             # x = "next"
-            # if x == "next":
-            #    return "KO", "cas aléatoire need fix"
+            if x == "next":
+                return "KO", "cas aléatoire need fix"
     return status, msg
 
 
