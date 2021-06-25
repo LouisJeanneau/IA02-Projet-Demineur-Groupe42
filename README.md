@@ -5,6 +5,23 @@
 
 <p>We developped a program to solve special minesweeper using SAT solver. </p>
 
+<h2>How to lauch </h2>
+
+<h3>Comment se lance le programme:</h3>
+
+lancer le main.py
+
+<h3>Fonctionnalités du programme::</h3>
+
+
+ utiliser pip install -r requirements.txt
+
+
+<h3>Spécificité de votre progamme:</h3>
+
+on a utiliser le solver pycryptosat ainsi que des listes d'attentes afin de traiter les différentes opérations
+
+
 <h2> :open_file_folder: Dependencies</h2>
 
 <p> We used pycryptosat solver (you can find it using pip). </p>
