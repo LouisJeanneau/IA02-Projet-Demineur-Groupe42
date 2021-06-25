@@ -1,5 +1,5 @@
 <h1 align="center"> Minesweeper solver </h1>
-<h3 align="center"> IA02 - Logique </h3>
+<h3 align="center"> IA02 - Logique et Résolution de problèmes par la recherche</h3>
 <h5 align="center"> Project Assignment - <a href="https://www.utc.fr/">Université de Technologie de Compiègne</a> (Spring 2021) </h5>
 
 
