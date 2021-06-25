@@ -19,11 +19,12 @@ def put_random_animal(map, animal: str, nombre: int):
             nombre = nombre + 1
 
 
-def generate_map(size: (int, int), percent_animal: (int, int, int, int)):
+def generate_map(size: (int, int), percent_animal: (int, int, int, int), postfix: str = ""):
     """
     call this function to generate new map in ../serveur/grilles/
     :param size:
     :param percent_animal:  Order is (tiger_count, shark_count, croco_count, water_croco_count)
+    :param postfix: pour faire des fichier a la chaine
     """
     hauteur = size[0]
     largeur = size[1]
@@ -57,7 +58,7 @@ def generate_map(size: (int, int), percent_animal: (int, int, int, int)):
             if 0 <= safe_y + l < largeur:
                 map[safe_x + k][safe_y + l] = list(constants.FIELD_CHAR.values())[random.randint(0, 1)]
 
-    with open(f"../serveur/grilles/grille_{percent_tiger}_{percent_shark}_{percent_croco}_{percent_water_croco}.croco",
+    with open(f"../serveur/grilles/grille_{hauteur}x{largeur}_densite{total / 100}_{postfix}.croco",
               'w+') as out_file:
         out_file.write(f"grille {percent_tiger}_{percent_shark}_{percent_croco}_{percent_water_croco}\n")
         out_file.write(f"{hauteur} {largeur}\n")
@@ -67,3 +68,9 @@ def generate_map(size: (int, int), percent_animal: (int, int, int, int)):
             for c in r:
                 out_file.write(f"{c} ")
             out_file.write("\n")
+
+
+def generate_maps(size: (int, int), percent_animal: (int, int, int, int), count: int):
+    for i in range(count):
+        generate_map(size, percent_animal, str(i))
+    return
