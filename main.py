@@ -347,16 +347,18 @@ def a_game(c: client.crocomine_client.CrocomineClient):
             while chord_queue:
                 # print(f'chordQ : {chord_queue}')
                 chord = chord_queue.pop(0)
-                status, msg, infos = c.chord(chord[0][0], chord[0][1])
-                if status == "KO":
-                    return status, msg
-                neighbours = get_neighbours(chord[0][0], chord[0][1], m, n)
-                for neighbour in neighbours:
-                    if discover_queue.count(neighbour):
-                        discover_queue.remove(neighbour)
-                    if neighbour in border_queue:
-                        border_queue.remove(neighbour)
-                s.add_clauses(processing_infos(infos, mat_info, border_queue, discover_queue, chord_queue))
+                if mat_info[chord[0][0]][chord[0][1]][
+                        "cleared_neighbours"] != mat_info[chord[0][0]][chord[0][1]]["neighbours"]:
+                    status, msg, infos = c.chord(chord[0][0], chord[0][1])
+                    if status == "KO":
+                        return status, msg
+                    neighbours = get_neighbours(chord[0][0], chord[0][1], m, n)
+                    for neighbour in neighbours:
+                        if discover_queue.count(neighbour):
+                            discover_queue.remove(neighbour)
+                        if neighbour in border_queue:
+                            border_queue.remove(neighbour)
+                    s.add_clauses(processing_infos(infos, mat_info, border_queue, discover_queue, chord_queue))
                 # print(f'discoverQ dans le chord : {discover_queue}')
         elif discover_queue and not played:
             played = True
@@ -391,7 +393,7 @@ def a_game(c: client.crocomine_client.CrocomineClient):
 # fonction qui se lance à l'éxecution
 if __name__ == '__main__':
     server = "http://croco.lagrue.ninja:8080"
-    group = "Groupe 42"
+    group = "Groupe 42 (run bis avec chord)"
     members = "Yvain et Louis"
     pwd = "g35aa5KvZxSCEPEL"
     croco = client.crocomine_client.CrocomineClient(server, group, members, pwd, False)
