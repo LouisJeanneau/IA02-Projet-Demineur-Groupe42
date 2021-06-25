@@ -50,7 +50,7 @@ class CrocomineClient:
 
         if animal:
             data["animal"] = animal
-        
+
         if password:
             data["password"] = password
 

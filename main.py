@@ -390,11 +390,11 @@ def a_game(c: client.crocomine_client.CrocomineClient):
 
 # fonction qui se lance à l'éxecution
 if __name__ == '__main__':
-    server = "http://croco.lagrue.ninja:8000"
+    server = "http://croco.lagrue.ninja:8080"
     group = "Groupe 42"
     members = "Yvain et Louis"
-    password = "on est trop beaux"
-    croco = client.crocomine_client.CrocomineClient(server, group, members, password, False)
+    pwd = "g35aa5KvZxSCEPEL"
+    croco = client.crocomine_client.CrocomineClient(server, group, members, pwd, False)
     status = "OK"
     t = Timer()
     t.start()
