@@ -5,13 +5,9 @@
 
 <p>We developped a  algorithms to solve special minesweeper using SAT solver. </p>
 
-![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/grass.png)
-
 <h2> :open_file_folder: Dependencies</h2>
 
 <p> We used pycryptosat solver (you can find it using pip). </p>
-
-![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/grass.png)
 
 
 <!-- CREDITS -->
