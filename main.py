@@ -392,7 +392,7 @@ def a_game(c: client.crocomine_client.CrocomineClient):
 
 # fonction qui se lance à l'éxecution
 if __name__ == '__main__':
-    server = "http://croco.lagrue.ninja:8080"
+    server = "http://croco.lagrue.ninja:80"
     group = "Groupe 42 (run bis avec chord)"
     members = "Yvain et Louis"
     pwd = "g35aa5KvZxSCEPEL"
