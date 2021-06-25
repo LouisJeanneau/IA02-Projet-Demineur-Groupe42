@@ -3,7 +3,7 @@
 <h5 align="center"> Project Assignment - <a href="https://www.utc.fr/">Université de Technologie de Compiègne</a> (Spring 2021) </h5>
 
 
-<p>We developped a  algorithms to solve special minesweeper using SAT solver. </p>
+<p>We developped a program to solve special minesweeper using SAT solver. </p>
 
 <h2> :open_file_folder: Dependencies</h2>
 
