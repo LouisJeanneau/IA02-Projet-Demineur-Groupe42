@@ -5,8 +5,6 @@ import subprocess
 from itertools import combinations
 import pycryptosat
 from helpers.timer import Timer, TimerError
-from multiprocessing import Process
-import sys
 
 voisins = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
 corres = ["T", "S", "C", "N"]
@@ -274,7 +272,7 @@ def a_game(c: client.crocomine_client.CrocomineClient):
     # Si il y a erreur, on quitte
     if status == "Err":
         print(f'erreur : {msg}')
-        return status, msg
+        return status, msg, gridInfos, None
 
     # sinon on récupère la taille de la map
     m = gridInfos["m"]
@@ -337,7 +335,7 @@ def a_game(c: client.crocomine_client.CrocomineClient):
                 guess = guess_queue.pop(0)
                 status, msg, infos = c.guess(guess[0], guess[1], guess[2])
                 if status == "KO":
-                    return status, msg
+                    return status, msg, gridInfos, mat_info
                 s.add_clauses(processing_infos(infos, mat_info, border_queue, discover_queue, chord_queue))
         elif chord_queue:
             played = True
@@ -351,7 +349,7 @@ def a_game(c: client.crocomine_client.CrocomineClient):
                         "cleared_neighbours"] != mat_info[chord[0][0]][chord[0][1]]["neighbours"]:
                     status, msg, infos = c.chord(chord[0][0], chord[0][1])
                     if status == "KO":
-                        return status, msg
+                        return status, msg, gridInfos, mat_info
                     neighbours = get_neighbours(chord[0][0], chord[0][1], m, n)
                     for neighbour in neighbours:
                         if discover_queue.count(neighbour):
@@ -366,10 +364,13 @@ def a_game(c: client.crocomine_client.CrocomineClient):
             # print(f' clearedprox : {mat_info[discover[0]][discover[1]]["cleared_prox"]} et proxcount {mat_info[discover[0]][discover[1]]["prox_count"]}')
             status, msg, infos = c.discover(discover[0], discover[1])
             if status == "KO":
-                return status, msg
+                return status, msg, gridInfos, mat_info
             s.add_clauses(processing_infos(infos, mat_info, border_queue, discover_queue, chord_queue))
         if not played:
             print("C'est la merde on sait pas quoi faire, mode aléatoire")
+
+            if not border_queue:
+                return "Err", "border list vide", gridInfos, mat_info
             border = border_queue.pop(0)
             sat, solution = s.solve()
             interest = solution[cell_to_variable(border[0], border[1], n, "T"):cell_to_variable(border[0], border[1], n, "N")+1]
@@ -386,24 +387,29 @@ def a_game(c: client.crocomine_client.CrocomineClient):
             # x = "next"
             x = "a"
             if x == "next":
-                return "KO", "cas aléatoire need fix"
-    return status, msg
+                return "KO", "cas aléatoire need fix", gridInfos, mat_info
+    return status, msg, gridInfos, mat_info
 
 
 # fonction qui se lance à l'éxecution
 if __name__ == '__main__':
     server = "http://croco.lagrue.ninja:80"
-    group = "Groupe 42 (run bis avec chord)"
+    group = "Groupe 42"
     members = "Yvain et Louis"
     pwd = "g35aa5KvZxSCEPEL"
-    croco = client.crocomine_client.CrocomineClient(server, group, members, pwd, False)
+    log = False
+    croco = client.crocomine_client.CrocomineClient(server, group, members, pwd, log)
     status = "OK"
     t = Timer()
     t.start()
     while status != "Err":
-        status, msg = a_game(croco)
+        status, msg, grid, mat = a_game(croco)
         t.lap()
-        if status != "GG":
+        if grid and mat:
+            affichage_mat(grid, mat)
+        if status == "KO":
             print(f"On s'est prix un KO")
+        elif status != "GG":
+            print("ni KO, ni GG")
         print("\n\n")
     t.stop()
